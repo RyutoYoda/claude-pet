@@ -15,17 +15,13 @@ Claude Code の実行状態を可視化する macOS デスクトップペット�
 
 ## インストール
 
-### 方法 1: pip インストール
+### 推奨: GitHub Releases からダウンロード
 
-```bash
-pip install claude-pet
-```
+[Releases](https://github.com/RyutoYoda/claude-pet/releases) から
+`Claude-Pet-*-installer.pkg` をダウンロードして開くだけで使えます。
+依存ライブラリの事前インストールは不要です。
 
-### 方法 2: GitHub Releases からダウンロード
-
-[Releases](https://github.com/RyutoYoda/claude-pet/releases) から最新の `.pkg` をダウンロードしてインストール。
-
-### 方法 3: ソースから実行
+### ソースから実行
 
 ```bash
 git clone https://github.com/RyutoYoda/claude-pet.git
@@ -38,22 +34,16 @@ uv run python -m claude_pet
 ### 起動
 
 ```bash
-claude-pet
-```
-
-または
-
-```bash
-uv run python -m claude_pet
+open /Applications/Claude\ Pet.app
 ```
 
 ### Claude Code との連携
 
-Claude Code の `~/.claude/settings.jsonl` にフックを設定:
+`~/.claude/settings.jsonl` に以下を追加:
 
 ```json
 {
-  "OnHook": "python /path/to/notify_hook.py"
+  "OnHook": "python /Applications/Claude\\ Pet.app/Contents/Resources/notify_hook.py"
 }
 ```
 
