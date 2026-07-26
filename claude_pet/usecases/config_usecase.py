@@ -9,11 +9,11 @@ class ConfigUsecase:
 
     def load_theme(self) -> Theme:
         raw = self._repo.load()
-        return Theme(dark_mode=bool(raw.get("dark_mode", True)))
+        return Theme(dark_mode=bool(raw.get("dark_mode", False)))
 
     def toggle_theme(self) -> Theme:
         raw = self._repo.load()
-        new_dark = not bool(raw.get("dark_mode", True))
+        new_dark = not bool(raw.get("dark_mode", False))
         raw["dark_mode"] = new_dark
         self._repo.save(raw)
         return Theme(dark_mode=new_dark)
