@@ -1,0 +1,10 @@
+__pycache__/
+.ruff_cache/
+.venv/
+uv.lock
+*.pyc
+.DS_Store
+dist/
+build/
+*.egg-info/
+*.app/

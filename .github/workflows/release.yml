@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Install py2app
+        run: uv pip install py2app
+
+      - name: Build .app bundle
+        run: uv run python setup.py py2app
+
+      - name: Build .pkg installer
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          pkgbuild \
+            --root dist/Claude\ Pet.app \
+            --identifier com.claude-pet.app \
+            --version "$version" \
+            --install-location /Applications/Claude\ Pet.app \
+            dist/Claude-Pet-$version.pkg
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Claude-Pet-*.pkg
+          generate_release_notes: true

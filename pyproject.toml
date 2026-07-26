@@ -1,0 +1,26 @@
+[project]
+name = "claude-pet"
+version = "1.0.0"
+description = "Claude Code デスクトップペット"
+requires-python = ">=3.11"
+dependencies = [
+    "pyobjc-core",
+    "pyobjc-framework-Cocoa",
+    "pyobjc-framework-Quartz",
+]
+
+[project.scripts]
+claude-pet = "claude_pet.app:main"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.0",
+]
+
+[tool.ruff.lint]
+ignore = [
+    "PLW0642",  # PyObjC requires `self = objc.super(...).init...()`
+    "DTZ005",   # ログ表示はローカル時刻が正しい
+    "EXE001",   # notify_hook.py はスクリプトとして使う
+    "PLW1510",  # notify_hook.py の curl 呼び出しはエラーを無視してよい
+]
