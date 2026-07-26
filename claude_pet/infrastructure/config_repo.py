@@ -6,6 +6,7 @@ from pathlib import Path
 _DEFAULTS: dict[str, object] = {
     "character_image": None,
     "dark_mode": False,
+    "voice_enabled": True,
 }
 
 

@@ -88,6 +88,10 @@ def main() -> None:
     )
     pet_view.set_log_panel(log_panel)
     pet_view.set_theme_getter(lambda: config_usecase.load_theme())
+    log_panel.contentView().set_voice_controls(
+        lambda: config_usecase.voice_enabled(),
+        lambda: config_usecase.toggle_voice(),
+    )
 
     from claude_pet.constants import BUBBLE_Y, PANEL_H, PANEL_W
 
@@ -114,6 +118,8 @@ def main() -> None:
     def on_notify(state: str, message: str | None) -> None:
         notification = notifier.build_notification(state, message)
         notifier.show_osx_notification(notification)
+        if config_usecase.voice_enabled():
+            notifier.speak(notification.message)
 
         def update() -> None:
             pet_state = PetState(notification.state)

@@ -58,7 +58,17 @@ class LogPanelView(NSView):
         self._selected_row: int | None = None
         self._on_settings = on_settings
         self._on_session = on_session
+        self._get_voice: Callable[[], bool] | None = None
+        self._on_toggle_voice: Callable[[], None] | None = None
         return self
+
+    def set_voice_controls(
+        self,
+        get_voice: Callable[[], bool],
+        on_toggle_voice: Callable[[], None],
+    ) -> None:
+        self._get_voice = get_voice
+        self._on_toggle_voice = on_toggle_voice
 
     def _theme(self) -> Theme:
         return self._get_theme()
@@ -137,6 +147,16 @@ class LogPanelView(NSView):
                 NSForegroundColorAttributeName: c["gear_btn"],
             },
         ).drawAtPoint_(NSMakePoint(PANEL_W - 56, header_y + 9))
+
+        if self._get_voice is not None:
+            voice_icon = "🔊" if self._get_voice() else "🔇"
+            NSAttributedString.alloc().initWithString_attributes_(
+                voice_icon,
+                {
+                    NSFontAttributeName: NSFont.systemFontOfSize_(12),
+                    NSForegroundColorAttributeName: c["theme_btn"],
+                },
+            ).drawAtPoint_(NSMakePoint(PANEL_W - 88, header_y + 12))
 
         theme_icon = "🌙" if self._theme().dark_mode else "☀️"
         NSAttributedString.alloc().initWithString_attributes_(
@@ -276,6 +296,9 @@ class LogPanelView(NSView):
                 self.setNeedsDisplay_(True)
             elif loc.x >= PANEL_W - 60:
                 self._on_settings()
+            elif loc.x >= PANEL_W - 92 and self._on_toggle_voice is not None:
+                self._on_toggle_voice()
+                self.setNeedsDisplay_(True)
             return
 
         if loc.y <= DETAIL_H:
