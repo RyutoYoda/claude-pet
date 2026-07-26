@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, sans-serif; font-size: 11pt; margin: 30px;">
+<h2>インストール完了</h2>
+<p>
+<code>/Applications/Claude Pet.app</code> にインストールされました。
+</p>
+<p>
+Finder から開くか、ターミナルで以下を実行してください:
+</p>
+<pre style="background: #f5f5f5; padding: 8px; border-radius: 4px;">
+open /Applications/Claude\ Pet.app
+</pre>
+<h3>Claude Code と連携するには</h3>
+<p>
+<code>~/.claude/settings.jsonl</code> に以下を追加します:
+</p>
+<pre style="background: #f5f5f5; padding: 8px; border-radius: 4px;">
+{
+  "OnHook": "python /Applications/Claude\\ Pet.app/Contents/Resources/notify_hook.py"
+}
+</pre>
+</body>
+</html>

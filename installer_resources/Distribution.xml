@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>Claude Pet</title>
+    <organization>com.claude-pet</organization>
+    <domains enable_localSystem="true"/>
+    <options customize="never" require-scripts="false" rootVolumeOnly="true"/>
+    <welcome file="welcome.html" mime-type="text/html"/>
+    <license file="license.html" mime-type="text/html"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+    <pkg-ref id="com.claude-pet.app"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="com.claude-pet.app"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="com.claude-pet.app" visible="false">
+        <pkg-ref id="com.claude-pet.app"/>
+    </choice>
+    <pkg-ref id="com.claude-pet.app" version="#VERSION#" onConclusion="none">Claude-Pet-#VERSION#.pkg</pkg-ref>
+</installer-gui-script>

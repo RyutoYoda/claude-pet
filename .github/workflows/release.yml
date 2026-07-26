@@ -33,7 +33,7 @@ jobs:
         run: |
           gh release upload "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
-            dist/Claude-Pet-*.pkg \
+            dist/Claude-Pet-*-installer.pkg \
             --clobber
         env:
           GH_TOKEN: ${{ github.token }}
