@@ -8,6 +8,7 @@ Claude Code の実行状態を可視化する macOS デスクトップペット�
 
 - Claude Code の状態（思考中・完了・待機）をキャラクターのアニメーションで表示
 - 吹き出しでメッセージを表示
+- **許可リクエストをペット上で承認/拒否**（ターミナルに切り替えずに承認できる）
 - macOS 通知センターに通知
 - 作業ログの表示・管理
 - ダークモード / ライトモード切替
@@ -120,10 +121,28 @@ rm -f ~/Library/Preferences/claude-pet.json
           }
         ]
       }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 '/Applications/Claude Pet.app/Contents/Resources/permission_hook.py'",
+            "timeout": 330
+          }
+        ]
+      }
     ]
   }
 }
 ```
+
+**PermissionRequest フック（承認機能）について:**
+
+- Claude Code が許可を求めると、ペットの横に「🔐 承認リクエスト」パネルが表示されます
+- **✅ 承認 / ❌ 拒否** をクリックするだけで、ターミナルに戻らずに回答できます
+- ペットが起動していないとき・約5分間ボタンを押さなかったときは、通常のターミナル上のプロンプトに自動でフォールバックします
 
 ### 操作
 

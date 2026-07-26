@@ -15,6 +15,7 @@ mkdir -p "$APP_DIR/Contents/Resources"
 cp -r claude_pet "$APP_DIR/Contents/Resources/"
 cp -r assets "$APP_DIR/Contents/Resources/"
 cp notify_hook.py "$APP_DIR/Contents/Resources/"
+cp permission_hook.py "$APP_DIR/Contents/Resources/"
 
 # ── Launcher (uses system python3 + PYTHONPATH) ──────────────────────────
 cat > "$APP_DIR/Contents/MacOS/$APP_NAME" << 'LAUNCHER'

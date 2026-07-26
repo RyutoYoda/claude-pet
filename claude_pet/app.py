@@ -124,7 +124,52 @@ def main() -> None:
 
         ui_queue.put(update)
 
-    http_server.start(on_notify)
+    # ── Permission approval ────────────────────────────────────────────────
+    from claude_pet.views.approval_panel import (
+        APPROVAL_H,
+        APPROVAL_W,
+        create_approval_panel,
+    )
+
+    pending_requests: list[tuple[str, str, str]] = []
+    current_request: dict = {"id": None}
+
+    def _show_next_request() -> None:
+        if not pending_requests:
+            approval_panel.orderOut_(None)
+            current_request["id"] = None
+            return
+        request_id, tool, detail = pending_requests.pop(0)
+        current_request["id"] = request_id
+        approval_view.set_request(tool, detail)
+        wf = window.frame()
+        px = wf.origin.x - APPROVAL_W - 8
+        py = wf.origin.y + BUBBLE_Y + 40
+        approval_panel.setFrameOrigin_(NSMakePoint(px, py))
+        approval_panel.makeKeyAndOrderFront_(None)
+
+    def on_decide(action: str) -> None:
+        request_id = current_request["id"]
+        if request_id:
+            http_server.resolve_permission(request_id, action)
+            label = "✅ 承認" if action == "allow" else "❌ 拒否"
+            entry = log_usecase.add(f"{label} {approval_view.summary()}")
+            pet_view.add_log_entry(entry)
+        _show_next_request()
+
+    approval_panel, approval_view = create_approval_panel(on_decide)
+
+    def on_permission(request_id: str, tool: str, detail: str) -> None:
+        def update() -> None:
+            pending_requests.append((request_id, tool, detail))
+            if current_request["id"] is None:
+                _show_next_request()
+            pet_view.state = PetState.waiting
+            pet_view.show_bubble(f"承認まって！\n{tool}")
+
+        ui_queue.put(update)
+
+    http_server.start(on_notify, on_permission)
     print(f"Claude Pet 起動完了 (port {PORT})")
     app.run()
 
