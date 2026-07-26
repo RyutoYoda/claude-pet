@@ -70,32 +70,6 @@ Claude Code の `~/.claude/settings.jsonl` にフックを設定:
 | 🌙/☀️ ボタン | テーマ切替 |
 | ⚙ ボタン | 設定パネル |
 
-## アーキテクチャ
-
-Clean Architecture に従って構成:
-
-```
-claude_pet/
-├── domain/          # エンティティ、値オブジェクト、Enum
-│   ├── entities.py       # LogEntry, Notification
-│   ├── enums.py          # PetState
-│   └── value_objects.py  # AnimationParams, Theme
-├── usecases/        # アプリケーション固有のビジネスロジック
-│   ├── animation_usecase.py
-│   ├── config_usecase.py
-│   └── log_usecase.py
-├── infrastructure/  # 外部サービス（HTTP, ファイル, 通知）
-│   ├── config_repo.py
-│   ├── http_server.py
-│   └── notification_service.py
-├── views/           # PyObjC UI レイヤー
-│   ├── pet_window.py
-│   ├── log_panel.py
-│   └── settings_panel.py
-├── app.py           # Composition Root
-└── constants.py
-```
-
 ## ライセンス
 
 [MIT](LICENSE)
