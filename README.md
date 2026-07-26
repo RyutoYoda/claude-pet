@@ -42,6 +42,9 @@ uv run python -m claude_pet
 
 ### 起動
 
+インストール後、Finder からは起動できません（Dock に表示されないアプリのため）。
+**必ずターミナルから以下のコマンドで起動してください：**
+
 ```bash
 open /Applications/Claude\ Pet.app
 ```
