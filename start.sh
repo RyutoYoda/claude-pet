@@ -1,3 +1,3 @@
 #!/bin/bash
-cd /Users/ryutoyoda/claude-pet
+cd "$(dirname "$0")"
 uv run python -m claude_pet
