@@ -21,25 +21,21 @@ cat > "$APP_DIR/Contents/MacOS/$APP_NAME" << 'LAUNCHER'
 #!/bin/bash
 DIR="$(cd "$(dirname "$0")/../Resources" && pwd)"
 SITE_PKG="$DIR/site-packages"
-PYTHON_VER_FILE="$DIR/python-version.txt"
+USER_SITE_PKG="$HOME/.local/share/claude-pet/site-packages"
 
-# Use the same Python that was used for dependency installation
-if [ -f "$PYTHON_VER_FILE" ]; then
-    PYTHON=$(head -1 "$PYTHON_VER_FILE")
-elif [ -f "$SITE_PKG/.python_path" ]; then
+# Resolve Python: prefer the one recorded at install time
+if [ -f "$SITE_PKG/.python_path" ]; then
     PYTHON=$(cat "$SITE_PKG/.python_path")
+elif [ -f "$USER_SITE_PKG/.python_path" ]; then
+    PYTHON=$(cat "$USER_SITE_PKG/.python_path")
 else
     PYTHON="/usr/bin/python3"
 fi
-
-if [ ! -x "$PYTHON" ]; then
-    PYTHON="/usr/bin/python3"
-fi
+[ -x "$PYTHON" ] || PYTHON="/usr/bin/python3"
 
 # On first launch, dependencies may not be installed yet
-if [ ! -f "$SITE_PKG/AppKit/__init__.py" ]; then
+if [ ! -f "$SITE_PKG/AppKit/__init__.py" ] && [ ! -f "$USER_SITE_PKG/AppKit/__init__.py" ]; then
     echo "Claude Pet: Installing dependencies (one-time setup)..."
-    mkdir -p "$SITE_PKG"
     PYTHON=""
     for p in /usr/bin/python3 /usr/local/bin/python3 /opt/homebrew/bin/python3; do
         if [ -x "$p" ]; then
@@ -56,15 +52,17 @@ if [ ! -f "$SITE_PKG/AppKit/__init__.py" ]; then
         osascript -e 'display dialog "Claude Pet には Python 3.9 以降が必要です。" buttons {"OK"} default button 1'
         exit 1
     fi
-    "$PYTHON" -m pip install --quiet --no-warn-script-location --target "$SITE_PKG" \
-        pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-Quartz 2>/dev/null
-    find "$SITE_PKG" -name '*.dSYM' -type d -exec rm -rf {} + 2>/dev/null || true
-    find "$SITE_PKG" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-    echo "$PYTHON" > "$SITE_PKG/.python_path"
+    # Install to user-writable location (works without root)
+    mkdir -p "$USER_SITE_PKG"
+    "$PYTHON" -m pip install --quiet --no-warn-script-location --target "$USER_SITE_PKG" \
+        pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-Quartz
+    find "$USER_SITE_PKG" -name '*.dSYM' -type d -exec rm -rf {} + 2>/dev/null || true
+    find "$USER_SITE_PKG" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+    echo "$PYTHON" > "$USER_SITE_PKG/.python_path"
     echo "Claude Pet: Dependencies ready"
 fi
 
-export PYTHONPATH="$SITE_PKG:$DIR"
+export PYTHONPATH="$SITE_PKG:$USER_SITE_PKG:$DIR"
 cd "$DIR"
 exec "$PYTHON" "$DIR/claude_pet/__main__.py"
 LAUNCHER
