@@ -2,7 +2,7 @@
 
 Claude Code の実行状態を可視化する macOS デスクトップペット。
 
-![screenshot](assets/screenshot.png)
+<img width="512" height="326" alt="スクリーンショット 2026-07-27 0 45 45" src="https://github.com/user-attachments/assets/8da50748-1bc0-40ca-ad21-87a471d47a1b" />
 
 ## 機能
 
