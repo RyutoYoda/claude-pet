@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -12,6 +13,7 @@ class _Handler(BaseHTTPRequestHandler):
     notify_callback: Callable[[str, str], None] | None = None
     permission_callback: Callable[[str, str, str], None] | None = None
     decisions: dict[str, str] = {}
+    last_poll: dict[str, float] = {}
 
     def _send_json(self, obj: dict) -> None:
         body = json.dumps(obj).encode("utf-8")
@@ -31,6 +33,7 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path == "/permission":
             request_id = str(data.get("id", ""))
             _Handler.decisions.pop(request_id, None)
+            _Handler.last_poll[request_id] = time.time()
             self._send_json({"ok": True})
             if _Handler.permission_callback and request_id:
                 _Handler.permission_callback(
@@ -50,6 +53,7 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path.startswith("/permission/"):
             request_id = self.path.rsplit("/", 1)[-1]
+            _Handler.last_poll[request_id] = time.time()
             self._send_json({"decision": _Handler.decisions.get(request_id)})
             return
         self.send_response(404)
@@ -72,3 +76,6 @@ class HttpServer:
 
     def resolve_permission(self, request_id: str, action: str) -> None:
         _Handler.decisions[request_id] = action
+
+    def last_poll_at(self, request_id: str) -> float:
+        return _Handler.last_poll.get(request_id, 0.0)

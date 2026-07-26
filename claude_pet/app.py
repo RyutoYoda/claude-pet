@@ -177,6 +177,39 @@ def main() -> None:
 
         ui_queue.put(update)
 
+    # フックのポーリングが止まったリクエスト（ターミナル側で回答済み・
+    # タイムアウト等）はパネルから自動で消す
+    import threading
+    import time as _time
+
+    _STALE_SEC = 3.0
+
+    def _watch_stale_requests() -> None:
+        while True:
+            _time.sleep(1.0)
+
+            def check() -> None:
+                now = _time.time()
+                pending_requests[:] = [
+                    r
+                    for r in pending_requests
+                    if now - http_server.last_poll_at(r[0]) < _STALE_SEC
+                ]
+                request_id = current_request["id"]
+                if (
+                    request_id
+                    and now - http_server.last_poll_at(request_id) >= _STALE_SEC
+                ):
+                    entry = log_usecase.add(
+                        "承認リクエスト終了（ターミナル側で回答または期限切れ）"
+                    )
+                    pet_view.add_log_entry(entry)
+                    _show_next_request()
+
+            ui_queue.put(check)
+
+    threading.Thread(target=_watch_stale_requests, daemon=True).start()
+
     http_server.start(on_notify, on_permission)
     print(f"Claude Pet 起動完了 (port {PORT})")
     app.run()
