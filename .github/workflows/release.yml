@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-latest
@@ -17,8 +20,20 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           bash build_app.sh "$version"
 
+      - name: Create Release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Upload .pkg to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/Claude-Pet-*.pkg
-          generate_release_notes: true
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            dist/Claude-Pet-*.pkg \
+            --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
