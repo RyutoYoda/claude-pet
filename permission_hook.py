@@ -6,6 +6,7 @@ Claude Pet が起動していない場合やタイムアウト時は何も出力
 """
 
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -16,6 +17,16 @@ PORT = 3131
 TIMEOUT_SEC = 290
 POLL_SEC = 0.5
 MAX_DETAIL = 300
+
+DEBUG_LOG = "/tmp/claude-pet-hook.log"
+
+
+def _log(msg: str) -> None:
+    try:
+        with open(DEBUG_LOG, "a") as f:
+            f.write(f"{time.strftime('%H:%M:%S')} [{os.getpid()}] {msg}\n")
+    except OSError:
+        pass
 
 
 def main() -> None:
@@ -34,6 +45,7 @@ def main() -> None:
     )
     detail = str(detail)[:MAX_DETAIL]
 
+    _log(f"request: tool={tool} detail={detail[:60]}")
     request_id = str(uuid.uuid4())
     payload = json.dumps(
         {"id": request_id, "tool": tool, "detail": detail}
@@ -45,8 +57,10 @@ def main() -> None:
     )
     try:
         urllib.request.urlopen(req, timeout=3)
-    except (urllib.error.URLError, OSError):
+    except (urllib.error.URLError, OSError) as e:
+        _log(f"POST failed: {e}")
         return  # Pet が起動していない → 通常のプロンプトへ
+    _log(f"POSTed id={request_id}")
 
     deadline = time.time() + TIMEOUT_SEC
     while time.time() < deadline:
@@ -55,9 +69,12 @@ def main() -> None:
                 f"http://127.0.0.1:{PORT}/permission/{request_id}", timeout=3
             ) as res:
                 decision = json.loads(res.read()).get("decision")
-        except (urllib.error.URLError, OSError, json.JSONDecodeError):
+        except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
+            _log(f"poll failed: {e}")
             return
 
+        if decision:
+            _log(f"decision={decision}")
         if decision == "allow":
             print(
                 json.dumps(
@@ -86,6 +103,7 @@ def main() -> None:
             )
             return
         time.sleep(POLL_SEC)
+    _log("timed out with no decision")
     # タイムアウト → 出力なし = 通常のプロンプトへ
 
 
