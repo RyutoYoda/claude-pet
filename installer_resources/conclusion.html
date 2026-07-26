@@ -32,9 +32,21 @@ open /Applications/Claude\ Pet.app
     "Stop": [{"matcher": "", "hooks": [{"type": "command",
       "command": "python3 '/Applications/Claude Pet.app/Contents/Resources/notify_hook.py'"}]}],
     "Notification": [{"matcher": "", "hooks": [{"type": "command",
-      "command": "python3 '/Applications/Claude Pet.app/Contents/Resources/notify_hook.py'"}]}]
+      "command": "python3 '/Applications/Claude Pet.app/Contents/Resources/notify_hook.py'"}]}],
+    "PermissionRequest": [{"matcher": "*", "hooks": [{"type": "command",
+      "command": "python3 '/Applications/Claude Pet.app/Contents/Resources/permission_hook.py'",
+      "timeout": 330}]}]
   }
 }
 </pre>
+<p>
+<strong>Stop / Notification</strong> — 作業完了・確認依頼をペットが吹き出しと音声でお知らせし、作業ログに記録します。<br>
+<strong>PermissionRequest</strong> — Claude Code の許可リクエストをペット上の「✅ 承認 / ❌ 拒否」ボタンで回答できます（ターミナルに戻る必要なし）。
+</p>
+<h3>音声読み上げについて</h3>
+<p>
+通知が来るとペットがメッセージを読み上げます（デフォルト ON）。<br>
+オフにするには、キャラクター下部をクリック → ログパネルの <strong>🔊</strong> アイコンをクリックしてください。
+</p>
 </body>
 </html>
