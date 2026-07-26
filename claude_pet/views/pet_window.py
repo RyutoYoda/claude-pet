@@ -127,9 +127,6 @@ class PetView(NSView):
         self.setNeedsDisplay_(True)
 
     def add_log_entry(self, entry: LogEntry) -> None:
-        self._logs.insert(0, entry)
-        if len(self._logs) > 50:
-            self._logs.pop()
         if self._log_panel and self._log_panel.isVisible():
             self._log_panel.contentView().setNeedsDisplay_(True)
 

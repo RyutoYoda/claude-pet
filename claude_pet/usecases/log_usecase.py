@@ -13,7 +13,7 @@ class LogUsecase:
 
     @property
     def logs(self) -> list[LogEntry]:
-        return list(self._logs)
+        return self._logs
 
     def add(self, message: str) -> LogEntry:
         entry = LogEntry(
