@@ -118,10 +118,10 @@ def main() -> None:
     def on_notify(state: str, message: str | None) -> None:
         notification = notifier.build_notification(state, message)
         notifier.show_osx_notification(notification)
-        if config_usecase.voice_enabled():
-            notifier.speak(notification.message)
 
         def update() -> None:
+            if config_usecase.voice_enabled():
+                notifier.speak(notification.message)
             pet_state = PetState(notification.state)
             pet_view.state = pet_state
             pet_view.show_bubble(notification.message)
@@ -172,6 +172,8 @@ def main() -> None:
                 _show_next_request()
             pet_view.state = PetState.waiting
             pet_view.show_bubble(f"承認まって！\n{tool}")
+            if config_usecase.voice_enabled():
+                notifier.speak(f"{tool}の承認をお願いします")
 
         ui_queue.put(update)
 
