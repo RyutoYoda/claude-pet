@@ -21,6 +21,15 @@ Claude Code の実行状態を可視化する macOS デスクトップペット�
 `Claude-Pet-*-installer.pkg` をダウンロードして開くだけで使えます。
 依存ライブラリの事前インストールは不要です。
 
+> **⚠️ macOS のセキュリティ警告について**
+>
+> 署名なし配布のため、ダウンロード後に開こうとすると
+> 「開発元を確認できないため開けません」と表示される場合があります。
+>
+> **回避方法（いずれか）:**
+> - PKG ファイルを **右クリック → 開く** → 「開く」をクリック
+> - または: **システム設定 → プライバシーとセキュリティ** を開き、画面下部の「このまま開く」をクリック
+
 ### ソースから実行
 
 ```bash
@@ -39,11 +48,34 @@ open /Applications/Claude\ Pet.app
 
 ### Claude Code との連携
 
-`~/.claude/settings.jsonl` に以下を追加:
+`~/.claude/settings.json` の `hooks` セクションに以下を追加:
 
 ```json
 {
-  "OnHook": "python /Applications/Claude\\ Pet.app/Contents/Resources/notify_hook.py"
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 '/Applications/Claude Pet.app/Contents/Resources/notify_hook.py'"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 '/Applications/Claude Pet.app/Contents/Resources/notify_hook.py'"
+          }
+        ]
+      }
+    ]
+  }
 }
 ```
 
