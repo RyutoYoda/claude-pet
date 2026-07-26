@@ -9,13 +9,19 @@
 <p>
 初回起動時に依存ライブラリを自動インストールするため、インターネット接続が必要です（数秒かかります）。
 </p>
-<p style="background: #e8f5e9; border-left: 4px solid #4caf50; padding: 10px; border-radius: 4px;">
-<strong>⚠️ 起動方法:</strong> このアプリは Dock に表示されません。<br>
-<strong>必ずターミナルから以下のコマンドで起動してください：</strong>
+<p style="background: #fff8e1; border-left: 4px solid #f5a623; padding: 10px; border-radius: 4px;">
+<strong>⚠️ インストールしただけでは起動しません。</strong><br>
+このアプリは Dock や Launchpad に表示されないため、<br>
+<strong>ターミナルから以下のコマンドで起動してください：</strong>
 </p>
 <pre style="background: #f5f5f5; padding: 8px; border-radius: 4px;">
 open /Applications/Claude\ Pet.app
 </pre>
+<p>
+数秒後、画面右下にキャラクターが表示されます。<br>
+停止するとき: <code>pkill -f claude_pet</code><br>
+アップデート時は先に停止してから新しい PKG をインストールしてください。
+</p>
 <h3>Claude Code と連携するには</h3>
 <p>
 <code>~/.claude/settings.json</code> の <code>hooks</code> セクションに以下を追加:

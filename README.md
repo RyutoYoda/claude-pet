@@ -40,14 +40,57 @@ uv run python -m claude_pet
 
 ## 使い方
 
-### 起動
+### 起動（重要）
 
-インストール後、Finder からは起動できません（Dock に表示されないアプリのため）。
-**必ずターミナルから以下のコマンドで起動してください：**
+このアプリは **Dock や Launchpad に表示されません**（デスクトップに常駐するタイプのアプリのため）。
+インストールしただけでは何も起きません。**ターミナルから以下のコマンドで起動してください：**
 
 ```bash
 open /Applications/Claude\ Pet.app
 ```
+
+数秒後、画面右下にキャラクターが表示されます。
+初回起動時のみ、依存ライブラリの自動インストールに少し時間がかかります（要インターネット接続・Python 3.10 以上）。
+
+### 停止
+
+Dock にアイコンがないため、終了もターミナルから行います：
+
+```bash
+pkill -f claude_pet
+```
+
+### アップデート（新しいバージョンを入れるとき）
+
+1. まず動作中のアプリを停止：
+   ```bash
+   pkill -f claude_pet
+   ```
+2. 新しい PKG をインストール（上書きされます）
+3. 再起動：
+   ```bash
+   open /Applications/Claude\ Pet.app
+   ```
+
+**アプリを停止せずに PKG を入れ直すと、古いバージョンが動き続けたままになるので注意してください。**
+
+### アンインストール（完全削除）
+
+```bash
+# 1. アプリを停止
+pkill -f claude_pet
+
+# 2. アプリ本体を削除
+sudo rm -rf "/Applications/Claude Pet.app"
+
+# 3. 依存ライブラリを削除
+rm -rf ~/.local/share/claude-pet
+
+# 4. 設定ファイルを削除
+rm -f ~/Library/Preferences/claude-pet.json
+```
+
+最後に、`~/.claude/settings.json` に連携フックを追加していた場合はその記述も削除してください。
 
 ### Claude Code との連携
 
