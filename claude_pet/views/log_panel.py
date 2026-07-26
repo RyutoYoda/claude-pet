@@ -8,6 +8,8 @@ from AppKit import (
     NSBezierPath,
     NSColor,
     NSFont,
+    NSFontAttributeName,
+    NSForegroundColorAttributeName,
     NSMakeRect,
     NSPanel,
     NSView,
@@ -123,16 +125,16 @@ class LogPanelView(NSView):
         NSAttributedString.alloc().initWithString_attributes_(
             "作業ログ",
             {
-                "NSFont": NSFont.boldSystemFontOfSize_(11),
-                "NSForegroundColor": c["title"],
+                NSFontAttributeName: NSFont.boldSystemFontOfSize_(11),
+                NSForegroundColorAttributeName: c["title"],
             },
         ).drawAtPoint_(NSMakePoint(12, header_y + 12))
 
         NSAttributedString.alloc().initWithString_attributes_(
             "⚙",
             {
-                "NSFont": NSFont.systemFontOfSize_(18),
-                "NSForegroundColor": c["gear_btn"],
+                NSFontAttributeName: NSFont.systemFontOfSize_(18),
+                NSForegroundColorAttributeName: c["gear_btn"],
             },
         ).drawAtPoint_(NSMakePoint(PANEL_W - 56, header_y + 9))
 
@@ -140,8 +142,8 @@ class LogPanelView(NSView):
         NSAttributedString.alloc().initWithString_attributes_(
             theme_icon,
             {
-                "NSFont": NSFont.systemFontOfSize_(12),
-                "NSForegroundColor": c["theme_btn"],
+                NSFontAttributeName: NSFont.systemFontOfSize_(12),
+                NSForegroundColorAttributeName: c["theme_btn"],
             },
         ).drawAtPoint_(NSMakePoint(PANEL_W - 26, header_y + 12))
 
@@ -163,30 +165,30 @@ class LogPanelView(NSView):
             NSAttributedString.alloc().initWithString_attributes_(
                 full_msg,
                 {
-                    "NSFont": NSFont.systemFontOfSize_(9),
-                    "NSForegroundColor": c["row_text"],
+                    NSFontAttributeName: NSFont.systemFontOfSize_(9),
+                    NSForegroundColorAttributeName: c["row_text"],
                 },
             ).drawInRect_(NSMakeRect(10, 4, PANEL_W - 20, DETAIL_H - 8))
         else:
             NSAttributedString.alloc().initWithString_attributes_(
                 "← 行をクリックで全文表示",
                 {
-                    "NSFont": NSFont.systemFontOfSize_(9),
-                    "NSForegroundColor": c["hint"],
+                    NSFontAttributeName: NSFont.systemFontOfSize_(9),
+                    NSForegroundColorAttributeName: c["hint"],
                 },
             ).drawAtPoint_(NSMakePoint(10, DETAIL_H // 2 - 4))
 
         row_attrs = {
-            "NSFont": NSFont.systemFontOfSize_(10),
-            "NSForegroundColor": c["row_text"],
+            NSFontAttributeName: NSFont.systemFontOfSize_(10),
+            NSForegroundColorAttributeName: c["row_text"],
         }
         time_attrs = {
-            "NSFont": NSFont.systemFontOfSize_(9),
-            "NSForegroundColor": c["row_time"],
+            NSFontAttributeName: NSFont.systemFontOfSize_(9),
+            NSForegroundColorAttributeName: c["row_time"],
         }
         x_btn_attrs = {
-            "NSFont": NSFont.systemFontOfSize_(9),
-            "NSForegroundColor": c["x_btn"],
+            NSFontAttributeName: NSFont.systemFontOfSize_(9),
+            NSForegroundColorAttributeName: c["x_btn"],
         }
 
         start = self._scroll_offset
@@ -216,13 +218,13 @@ class LogPanelView(NSView):
             truncated = truncated.replace("\n", " ")
             NSAttributedString.alloc().initWithString_attributes_(
                 truncated, row_attrs
-            ).drawInRect_(NSMakeRect(42, y + 4, PANEL_W - 90, LOG_ROW_H - 4))
+            ).drawAtPoint_(NSMakePoint(42, y + 4))
 
             NSAttributedString.alloc().initWithString_attributes_(
                 "▶",
                 {
-                    "NSFont": NSFont.systemFontOfSize_(9),
-                    "NSForegroundColor": c["session_btn"],
+                    NSFontAttributeName: NSFont.systemFontOfSize_(9),
+                    NSForegroundColorAttributeName: c["session_btn"],
                 },
             ).drawAtPoint_(NSMakePoint(PANEL_W - 42, y + 6))
 

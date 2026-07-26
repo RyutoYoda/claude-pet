@@ -13,6 +13,8 @@ from AppKit import (
     NSBezierPath,
     NSColor,
     NSFont,
+    NSFontAttributeName,
+    NSForegroundColorAttributeName,
     NSImage,
     NSImageView,
     NSMakeRect,
@@ -183,8 +185,8 @@ class PetView(NSView):
         NSString.stringWithString_(text).drawInRect_withAttributes_(
             NSMakeRect(8, bubble_y + 6, 142, bh - 10),
             {
-                "NSFont": NSFont.systemFontOfSize_weight_(10, 0.3),
-                "NSForegroundColor": text_color,
+                NSFontAttributeName: NSFont.systemFontOfSize_weight_(10, 0.3),
+                NSForegroundColorAttributeName: text_color,
             },
         )
 

@@ -104,6 +104,12 @@ def main() -> None:
 
     pet_view.set_toggle_log_callback(toggle_log_panel)
 
+    # デバッグ用: CLAUDE_PET_SHOW_LOG=1 で起動時にログパネルを表示
+    import os
+
+    if os.environ.get("CLAUDE_PET_SHOW_LOG"):
+        ui_queue.put(toggle_log_panel)
+
     # ── Notification handler ───────────────────────────────────────────────
     def on_notify(state: str, message: str | None) -> None:
         notification = notifier.build_notification(state, message)

@@ -9,6 +9,8 @@ from AppKit import (
     NSBezierPath,
     NSColor,
     NSFont,
+    NSFontAttributeName,
+    NSForegroundColorAttributeName,
     NSImage,
     NSImageView,
     NSMakeRect,
@@ -77,12 +79,12 @@ class SettingsPanelView(NSView):
 
         NSString.stringWithString_("設定").drawAtPoint_withAttributes_(
             NSMakePoint(SETTINGS_W / 2 - 14, SETTINGS_H - 38),
-            {"NSFont": NSFont.boldSystemFontOfSize_(14), "NSForegroundColor": white},
+            {NSFontAttributeName: NSFont.boldSystemFontOfSize_(14), NSForegroundColorAttributeName: white},
         )
 
         NSString.stringWithString_("キャラクター画像").drawAtPoint_withAttributes_(
             NSMakePoint(12, 128),
-            {"NSFont": NSFont.systemFontOfSize_(10), "NSForegroundColor": gray},
+            {NSFontAttributeName: NSFont.systemFontOfSize_(10), NSForegroundColorAttributeName: gray},
         )
 
         img_path = self._config.get("character_image")
@@ -90,8 +92,8 @@ class SettingsPanelView(NSView):
         NSString.stringWithString_(filename[:34]).drawAtPoint_withAttributes_(
             NSMakePoint(12, 110),
             {
-                "NSFont": NSFont.systemFontOfSize_(9),
-                "NSForegroundColor": NSColor.colorWithWhite_alpha_(0.7, 1.0),
+                NSFontAttributeName: NSFont.systemFontOfSize_(9),
+                NSForegroundColorAttributeName: NSColor.colorWithWhite_alpha_(0.7, 1.0),
             },
         )
 
@@ -112,8 +114,8 @@ class SettingsPanelView(NSView):
         NSString.stringWithString_(label).drawAtPoint_withAttributes_(
             NSMakePoint(rect.origin.x + 8, rect.origin.y + 8),
             {
-                "NSFont": NSFont.systemFontOfSize_(10),
-                "NSForegroundColor": NSColor.colorWithWhite_alpha_(0.9, 1.0),
+                NSFontAttributeName: NSFont.systemFontOfSize_(10),
+                NSForegroundColorAttributeName: NSColor.colorWithWhite_alpha_(0.9, 1.0),
             },
         )
 
