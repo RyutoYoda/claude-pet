@@ -37,19 +37,19 @@ fi
 if [ ! -f "$SITE_PKG/AppKit/__init__.py" ] && [ ! -f "$USER_SITE_PKG/AppKit/__init__.py" ]; then
     echo "Claude Pet: Installing dependencies (one-time setup)..."
     PYTHON=""
-    for p in /usr/bin/python3 /usr/local/bin/python3 /opt/homebrew/bin/python3; do
+    for p in /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
         if [ -x "$p" ]; then
             VER=$("$p" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
             MAJ=$(echo "$VER" | cut -d. -f1)
             MIN=$(echo "$VER" | cut -d. -f2)
-            if [ "$MAJ" = "3" ] && [ "$MIN" -ge 9 ] 2>/dev/null; then
+            if [ "$MAJ" = "3" ] && [ "$MIN" -ge 10 ] 2>/dev/null; then
                 PYTHON="$p"
                 break
             fi
         fi
     done
     if [ -z "$PYTHON" ]; then
-        osascript -e 'display dialog "Claude Pet には Python 3.9 以降が必要です。" buttons {"OK"} default button 1'
+        osascript -e 'display dialog "Claude Pet には Python 3.10 以降が必要です。\nHomebrew で: brew install python" buttons {"OK"} default button 1'
         exit 1
     fi
     # Install to user-writable location (works without root)

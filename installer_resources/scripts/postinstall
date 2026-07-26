@@ -5,12 +5,12 @@ APP_PATH="/Applications/Claude Pet.app"
 SITE_PKG="$APP_PATH/Contents/Resources/site-packages"
 
 PYTHON=""
-for p in /usr/bin/python3 /usr/local/bin/python3 /opt/homebrew/bin/python3; do
+for p in /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
     if [ -x "$p" ]; then
         VER=$("$p" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
         MAJ=$(echo "$VER" | cut -d. -f1)
         MIN=$(echo "$VER" | cut -d. -f2)
-        if [ "$MAJ" = "3" ] && [ "$MIN" -ge 9 ] 2>/dev/null; then
+        if [ "$MAJ" = "3" ] && [ "$MIN" -ge 10 ] 2>/dev/null; then
             PYTHON="$p"
             break
         fi
@@ -18,7 +18,7 @@ for p in /usr/bin/python3 /usr/local/bin/python3 /opt/homebrew/bin/python3; do
 done
 
 if [ -z "$PYTHON" ]; then
-    echo "Claude Pet: Python 3.9+ not found."
+    echo "Claude Pet: Python 3.10+ not found. Install via: brew install python"
     exit 0
 fi
 
