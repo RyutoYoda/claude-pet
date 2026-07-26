@@ -100,6 +100,9 @@ class PetView(NSView):
     def set_toggle_log_callback(self, cb: Callable[[], None]) -> None:
         self._toggle_log = cb
 
+    def set_theme_getter(self, getter: Callable) -> None:
+        self._get_theme = getter
+
     def _load_character_image(self, path: str | None = None) -> None:
         if path and Path(path).exists():
             img = NSImage.alloc().initWithContentsOfFile_(path)
@@ -165,9 +168,18 @@ class PetView(NSView):
         rect = NSMakeRect(2, bubble_y, 156, bh)
         path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(rect, 8, 8)
 
-        NSColor.colorWithWhite_alpha_(1.0, 0.95).set()
+        dark = hasattr(self, "_get_theme") and self._get_theme().dark_mode
+        if dark:
+            NSColor.colorWithWhite_alpha_(0.18, 0.95).set()
+            border_color = NSColor.colorWithWhite_alpha_(0.45, 1.0)
+            text_color = NSColor.colorWithWhite_alpha_(0.92, 1.0)
+        else:
+            NSColor.colorWithWhite_alpha_(1.0, 0.95).set()
+            border_color = NSColor.colorWithWhite_alpha_(0.35, 1.0)
+            text_color = NSColor.colorWithWhite_alpha_(0.15, 1.0)
+
         path.fill()
-        NSColor.colorWithWhite_alpha_(0.35, 1.0).set()
+        border_color.set()
         path.setLineWidth_(1.0)
         path.stroke()
 
@@ -175,7 +187,7 @@ class PetView(NSView):
             NSMakeRect(8, bubble_y + 6, 142, bh - 10),
             {
                 "NSFont": NSFont.systemFontOfSize_weight_(10, 0.3),
-                "NSForegroundColor": NSColor.colorWithWhite_alpha_(0.15, 1.0),
+                "NSForegroundColor": text_color,
             },
         )
 

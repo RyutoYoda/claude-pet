@@ -87,6 +87,7 @@ def main() -> None:
         on_session=_activate_terminal,
     )
     pet_view.set_log_panel(log_panel)
+    pet_view.set_theme_getter(lambda: config_usecase.load_theme())
 
     from claude_pet.constants import BUBBLE_Y, PANEL_H, PANEL_W
 
