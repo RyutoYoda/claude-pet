@@ -1,6 +1,6 @@
 from setuptools import setup
 
-APP = ["claude_pet/app.py"]
+APP = ["run_pet.py"]
 DATA_FILES = [("assets", ["assets/pet.png"])]
 OPTIONS = {
     "argv_emulation": False,
