@@ -63,11 +63,12 @@ find "$APP_DIR" -name '.DS_Store' -delete 2>/dev/null || true
 chmod -R u+w "$APP_DIR"
 echo "=== .app bundle created ==="
 
+PKG_FILE="dist/Claude-Pet-${VERSION}.pkg"
 pkgbuild \
     --root "$APP_DIR" \
     --identifier com.claude-pet.app \
     --version "$VERSION" \
     --install-location "/Applications/$APP_NAME.app" \
-    "dist/$APP_NAME-$VERSION.pkg"
+    "$PKG_FILE"
 echo "=== .pkg created ==="
-ls -lh "dist/$APP_NAME-$VERSION.pkg"
+ls -lh "$PKG_FILE"
