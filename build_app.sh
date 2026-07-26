@@ -11,48 +11,50 @@ rm -rf dist
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
-# Copy Python package and assets
+# Copy Python package and assets (no bundled deps — installed via postinstall)
 cp -r claude_pet "$APP_DIR/Contents/Resources/"
 cp -r assets "$APP_DIR/Contents/Resources/"
 cp notify_hook.py "$APP_DIR/Contents/Resources/"
 
-# ── Bundle a self-contained Python venv ───────────────────────────────────
-echo "=== Creating bundled venv ==="
-BUNDLED_PYTHON="/usr/bin/python3"
-if [ ! -x "$BUNDLED_PYTHON" ]; then
-    BUNDLED_PYTHON=$(which python3)
-fi
-echo "Using Python: $BUNDLED_PYTHON ($("$BUNDLED_PYTHON" --version 2>&1))"
-
-VENV_DIR="$APP_DIR/Contents/Resources/venv"
-"$BUNDLED_PYTHON" -m venv "$VENV_DIR"
-
-# Install dependencies into the venv
-"$VENV_DIR/bin/pip" install --quiet --upgrade pip
-"$VENV_DIR/bin/pip" install --quiet \
-    pyobjc-core \
-    pyobjc-framework-Cocoa \
-    pyobjc-framework-Quartz
-
-# Strip bytecode and clean up
-find "$VENV_DIR" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-find "$VENV_DIR" -name '*.pyc' -delete 2>/dev/null || true
-rm -rf "$VENV_DIR/include" 2>/dev/null || true
-rm -rf "$VENV_DIR/lib/python3."*/test 2>/dev/null || true
-rm -rf "$VENV_DIR/lib/python3."*/site-packages/pip* 2>/dev/null || true
-rm -rf "$VENV_DIR/lib/python3."*/site-packages/setuptools* 2>/dev/null || true
-# Keep only the site-packages with installed deps
-echo "=== Venv size ==="
-du -sh "$VENV_DIR"
-
-# ── Launcher ──────────────────────────────────────────────────────────────
+# ── Launcher (uses system python3 + PYTHONPATH) ──────────────────────────
 cat > "$APP_DIR/Contents/MacOS/$APP_NAME" << 'LAUNCHER'
 #!/bin/bash
 DIR="$(cd "$(dirname "$0")/../Resources" && pwd)"
-export PYTHONHOME="$DIR/venv"
-export PATH="$DIR/venv/bin:/usr/bin:/bin"
+SITE_PKG="$DIR/site-packages"
+
+# On first launch, dependencies may not be installed yet.
+# The postinstall script handles installation, but if the pkg
+# was installed without running scripts (e.g. dragging .app), 
+# install on first launch.
+if [ ! -f "$SITE_PKG/AppKit/__init__.py" ]; then
+    echo "Claude Pet: Installing dependencies (one-time setup)..."
+    mkdir -p "$SITE_PKG"
+    PYTHON=""
+    for p in /usr/bin/python3 /usr/local/bin/python3 /opt/homebrew/bin/python3; do
+        if [ -x "$p" ]; then
+            VER=$("$p" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+            MAJ=$(echo "$VER" | cut -d. -f1)
+            MIN=$(echo "$VER" | cut -d. -f2)
+            if [ "$MAJ" = "3" ] && [ "$MIN" -ge 9 ] 2>/dev/null; then
+                PYTHON="$p"
+                break
+            fi
+        fi
+    done
+    if [ -z "$PYTHON" ]; then
+        osascript -e 'display dialog "Claude Pet には Python 3.9 以降が必要です。" buttons {"OK"} default button 1'
+        exit 1
+    fi
+    "$PYTHON" -m pip install --quiet --no-warn-script-location --target "$SITE_PKG" \
+        pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-Quartz 2>/dev/null
+    find "$SITE_PKG" -name '*.dSYM' -type d -exec rm -rf {} + 2>/dev/null || true
+    find "$SITE_PKG" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+    echo "Claude Pet: Dependencies ready"
+fi
+
+export PYTHONPATH="$SITE_PKG:$DIR"
 cd "$DIR"
-exec "$DIR/venv/bin/python3" -m claude_pet
+exec /usr/bin/python3 "$DIR/claude_pet/__main__.py"
 LAUNCHER
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
 
@@ -95,13 +97,16 @@ chmod -R u+w "$APP_DIR"
 echo "=== .app bundle created ==="
 du -sh "$APP_DIR"
 
-# ── Build component pkg ───────────────────────────────────────────────────
+# ── Build component pkg with postinstall script ──────────────────────────
+chmod +x installer_resources/scripts/postinstall
+
 COMPONENT_PKG="dist/Claude-Pet-${VERSION}.pkg"
 pkgbuild \
     --root "$APP_DIR" \
     --identifier com.claude-pet.app \
     --version "$VERSION" \
     --install-location "/Applications/$APP_NAME.app" \
+    --scripts installer_resources/scripts \
     "$COMPONENT_PKG"
 
 # ── Build distribution pkg (with installer UI) ────────────────────────────

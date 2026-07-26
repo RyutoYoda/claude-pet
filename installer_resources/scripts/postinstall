@@ -1,0 +1,44 @@
+#!/bin/bash
+# Post-install script for Claude Pet
+# Installs Python dependencies for the bundled app
+
+APP_PATH="/Applications/Claude Pet.app"
+SITE_PKG="$APP_PATH/Contents/Resources/site-packages"
+
+# Find a suitable Python 3
+PYTHON=""
+for p in /usr/bin/python3 /usr/local/bin/python3 /opt/homebrew/bin/python3; do
+    if [ -x "$p" ]; then
+        VER=$("$p" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+        if [ "$(echo "$VER" | cut -d. -f1)" = "3" ] && [ "$(echo "$VER" | cut -d. -f2)" -ge 9 ]; then
+            PYTHON="$p"
+            break
+        fi
+    fi
+done
+
+if [ -z "$PYTHON" ]; then
+    echo "Claude Pet: Python 3.9+ not found. Please install Python 3."
+    exit 1
+fi
+
+echo "Claude Pet: Installing dependencies with $PYTHON"
+
+mkdir -p "$SITE_PKG"
+"$PYTHON" -m pip install --quiet --no-warn-script-location --target "$SITE_PKG" \
+    pyobjc-core \
+    pyobjc-framework-Cocoa \
+    pyobjc-framework-Quartz \
+    2>/dev/null
+
+# Clean up
+find "$SITE_PKG" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+find "$SITE_PKG" -name '*.pyc' -delete 2>/dev/null || true
+rm -rf "$SITE_PKG"/*.dist-info/INSTALLER "$SITE_PKG"/*.dist-info/REQUESTED 2>/dev/null || true
+# Remove .dSYM debug symbols
+find "$SITE_PKG" -name '*.dSYM' -type d -exec rm -rf {} + 2>/dev/null || true
+
+# Record which Python was used
+"$PYTHON" --version > "$APP_PATH/Contents/Resources/python-version.txt" 2>&1
+echo "Claude Pet: Dependencies installed successfully"
+exit 0
