@@ -2,6 +2,14 @@
 
 Claude Code の実行状態を可視化する macOS デスクトップペット。
 
+<p align="left">
+  <img src="https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white" />
+  <img src="https://img.shields.io/badge/AppKit_(PyObjC)-2396F3?style=flat&logo=apple&logoColor=white" />
+  <img src="https://img.shields.io/badge/Claude_Code-191919?style=flat&logo=anthropic&logoColor=white" />
+  <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat&logo=githubactions&logoColor=white" />
+</p>
+
 <img width="521" height="466" alt="スクリーンショット 2026-07-27 1 48 04" src="https://github.com/user-attachments/assets/cbe2bae7-0f0c-43c5-b1d6-5651881c0d9a" />
 
 ## 機能
