@@ -21,11 +21,22 @@ cat > "$APP_DIR/Contents/MacOS/$APP_NAME" << 'LAUNCHER'
 #!/bin/bash
 DIR="$(cd "$(dirname "$0")/../Resources" && pwd)"
 SITE_PKG="$DIR/site-packages"
+PYTHON_VER_FILE="$DIR/python-version.txt"
 
-# On first launch, dependencies may not be installed yet.
-# The postinstall script handles installation, but if the pkg
-# was installed without running scripts (e.g. dragging .app), 
-# install on first launch.
+# Use the same Python that was used for dependency installation
+if [ -f "$PYTHON_VER_FILE" ]; then
+    PYTHON=$(head -1 "$PYTHON_VER_FILE")
+elif [ -f "$SITE_PKG/.python_path" ]; then
+    PYTHON=$(cat "$SITE_PKG/.python_path")
+else
+    PYTHON="/usr/bin/python3"
+fi
+
+if [ ! -x "$PYTHON" ]; then
+    PYTHON="/usr/bin/python3"
+fi
+
+# On first launch, dependencies may not be installed yet
 if [ ! -f "$SITE_PKG/AppKit/__init__.py" ]; then
     echo "Claude Pet: Installing dependencies (one-time setup)..."
     mkdir -p "$SITE_PKG"
@@ -49,12 +60,13 @@ if [ ! -f "$SITE_PKG/AppKit/__init__.py" ]; then
         pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-Quartz 2>/dev/null
     find "$SITE_PKG" -name '*.dSYM' -type d -exec rm -rf {} + 2>/dev/null || true
     find "$SITE_PKG" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+    echo "$PYTHON" > "$SITE_PKG/.python_path"
     echo "Claude Pet: Dependencies ready"
 fi
 
 export PYTHONPATH="$SITE_PKG:$DIR"
 cd "$DIR"
-exec /usr/bin/python3 "$DIR/claude_pet/__main__.py"
+exec "$PYTHON" "$DIR/claude_pet/__main__.py"
 LAUNCHER
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
 
