@@ -39,9 +39,15 @@ class NotificationService:
 
     def show_osx_notification(self, notification: Notification) -> None:
         sound = "Glass" if notification.state == "done" else "Ping"
+        # AppleScript 文字列として安全になるようエスケープ
+        msg = (
+            notification.message.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", " ")
+        )
         cmd = (
-            f'display notification "{notification.message}" '
-            f'title "Claude Pet" '
+            f'display notification "{msg}" '
+            f'with title "Claude Pet" '
             f'subtitle "{notification.state}" '
             f'sound name "{sound}"'
         )
