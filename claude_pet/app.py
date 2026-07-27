@@ -207,7 +207,7 @@ def main() -> None:
             pet_view.state = PetState.waiting
             pet_view.show_bubble(f"承認お願い！\n{tool}")
             if config_usecase.voice_enabled():
-                notifier.speak(f"{tool}の承認をお願いします")
+                notifier.speak("Claude Codeからの承認をお願いします！")
 
         ui_queue.put(update)
 
