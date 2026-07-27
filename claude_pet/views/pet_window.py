@@ -48,6 +48,13 @@ class PetWindowDelegate(NSObject):
         NSApplication.sharedApplication().terminate_(None)
         return True
 
+    def set_on_screens_changed(self, cb: Callable[[], None]) -> None:
+        self._on_screens_changed = cb
+
+    def screensChanged_(self, notification) -> None:
+        if hasattr(self, "_on_screens_changed"):
+            self._on_screens_changed()
+
 
 class PetView(NSView):
     def initWithFrame_state_bubbleText_logs_animation_onActivateTerminal_(

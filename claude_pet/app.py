@@ -39,11 +39,15 @@ def main() -> None:
     config_usecase = ConfigUsecase(config_repo)
 
     # ── Screen setup ───────────────────────────────────────────────────────
-    screen_frame = NSScreen.mainScreen().frame()
     # 高さは吹き出しの最大サイズ（8行）が収まるように確保
     win_w, win_h = 162, 360
-    win_x = screen_frame.size.width - win_w - 20
-    win_y = 80
+
+    def _default_origin() -> tuple[float, float]:
+        # visibleFrame は Dock やメニューバーを除いた領域。原点も考慮する
+        vf = NSScreen.mainScreen().visibleFrame()
+        return (vf.origin.x + vf.size.width - win_w - 20, vf.origin.y + 80)
+
+    win_x, win_y = _default_origin()
 
     window = PetWindow.alloc().initWithContentRect_styleMask_backing_defer_(
         NSMakeRect(win_x, win_y, win_w, win_h),
@@ -61,6 +65,28 @@ def main() -> None:
 
     delegate = PetWindowDelegate.alloc().init()
     window.setDelegate_(delegate)
+
+    # ── ディスプレイ構成変更への追従 ─────────────────────────────────────
+    # 外部ディスプレイの接続/切断でウィンドウが画面外に取り残されたら、
+    # メイン画面の右下に戻す
+    from Foundation import NSIntersectsRect, NSNotificationCenter
+
+    def _ensure_on_screen() -> None:
+        wf = window.frame()
+        for screen in NSScreen.screens():
+            if NSIntersectsRect(wf, screen.frame()):
+                return
+        x, y = _default_origin()
+        window.setFrameOrigin_(NSMakePoint(x, y))
+        window.orderFront_(None)
+
+    delegate.set_on_screens_changed(lambda: ui_queue.put(_ensure_on_screen))
+    NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(
+        delegate,
+        "screensChanged:",
+        "NSApplicationDidChangeScreenParametersNotification",
+        None,
+    )
 
     # ── Pet View ───────────────────────────────────────────────────────────
     initial_state = PetState.idle
