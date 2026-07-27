@@ -13,6 +13,8 @@ from AppKit import (
     NSGraphicsContext,
     NSMakeRect,
     NSPanel,
+    NSTimer,
+    NSTrackingArea,
     NSView,
     NSWindowStyleMaskBorderless,
 )
@@ -28,6 +30,17 @@ from claude_pet.constants import (
 )
 from claude_pet.domain.entities import LogEntry
 from claude_pet.domain.value_objects import Theme
+from claude_pet.infrastructure.usage_stats import (
+    UsageStats,
+    _fmt_tokens,
+    load_usage_stats,
+)
+
+_BAR_SLOT_W = (PANEL_W - 20) / 7  # ~34.3px per day slot
+_BAR_W = _BAR_SLOT_W - 8  # ~26.3px bar width
+_BAR_BOTTOM = 14  # y of bar base (AppKit coords)
+_BAR_MAX_H = 52  # max bar height in px
+_LABEL_Y = 2  # y of day label
 
 
 class LogPanel(NSPanel):
@@ -63,7 +76,29 @@ class LogPanelView(NSView):
         self._on_session = on_session
         self._get_voice: Callable[[], bool] | None = None
         self._on_toggle_voice: Callable[[], None] | None = None
+        self._usage: UsageStats | None = None
+        self._show_usage_detail = False
+        self._hover_bar_index: int | None = None
+        self._refresh_usage()
+        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            30.0, self, "refreshUsageTick:", None, True
+        )
+        # NSTrackingMouseMoved(2) | NSTrackingActiveAlways(128) | NSTrackingMouseEnteredAndExited(1)
+        ta = NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+            NSMakeRect(0, 0, PANEL_W, PANEL_H), 2 | 128 | 1, self, None
+        )
+        self.addTrackingArea_(ta)
         return self
+
+    def _refresh_usage(self) -> None:
+        try:
+            self._usage = load_usage_stats()
+        except OSError:
+            pass
+
+    def refreshUsageTick_(self, timer) -> None:
+        self._refresh_usage()
+        self.setNeedsDisplay_(True)
 
     def set_voice_controls(
         self,
@@ -151,6 +186,28 @@ class LogPanelView(NSView):
             },
         ).drawAtPoint_(NSMakePoint(PANEL_W - 56, header_y + 9))
 
+        # 利用量バッジ（🔊の左側）cost / token
+        if self._usage is not None:
+            u = self._usage
+            badge_text = f"${u.today_cost:.2f} / {_fmt_tokens(u.today_tokens)}"
+            badge_color = (
+                NSColor.colorWithRed_green_blue_alpha_(0.3, 0.75, 0.45, 1.0)
+                if self._theme().dark_mode
+                else NSColor.colorWithRed_green_blue_alpha_(0.1, 0.55, 0.3, 1.0)
+            )
+            if self._show_usage_detail:
+                badge_color = NSColor.colorWithRed_green_blue_alpha_(
+                    0.35, 0.65, 0.95, 1.0
+                )
+            badge_attr = NSAttributedString.alloc().initWithString_attributes_(
+                badge_text,
+                {
+                    NSFontAttributeName: NSFont.systemFontOfSize_(8),
+                    NSForegroundColorAttributeName: badge_color,
+                },
+            )
+            badge_attr.drawAtPoint_(NSMakePoint(105, header_y + 13))
+
         if self._get_voice is not None:
             voice_icon = "🔊" if self._get_voice() else "🔇"
             NSAttributedString.alloc().initWithString_attributes_(
@@ -183,13 +240,109 @@ class LogPanelView(NSView):
         sep2.setLineWidth_(0.5)
         sep2.stroke()
 
-        detail_entry = None
-        if self._selected_row is not None and 0 <= self._selected_row < len(self._logs):
-            detail_entry = self._logs[self._selected_row]
-        elif self._logs:
-            detail_entry = self._logs[0]  # 未選択時は最新のログを表示
+        detail_entry: LogEntry | None = None
 
-        if detail_entry is not None:
+        # 利用量詳細表示モード（棒グラフ）
+        if self._show_usage_detail and self._usage is not None:
+            u = self._usage
+            small_attrs = {
+                NSFontAttributeName: NSFont.systemFontOfSize_(8),
+                NSForegroundColorAttributeName: c["row_time"],
+            }
+            # 週/月サマリー（上部1行）
+            summary = f"7日 ${u.week_cost:.2f}  /  30日 ${u.month_cost:.2f}"
+            NSAttributedString.alloc().initWithString_attributes_(
+                summary, small_attrs
+            ).drawAtPoint_(NSMakePoint(10, DETAIL_H - 14))
+
+            # 棒グラフ
+            daily = u.daily_stats
+            if daily:
+                max_tok = max((d.tokens for d in daily), default=1) or 1
+                for i, ds in enumerate(daily):
+                    bx = 10 + i * _BAR_SLOT_W
+                    bar_h = max(2.0, _BAR_MAX_H * ds.tokens / max_tok)
+
+                    if ds.is_today:
+                        bar_color = NSColor.colorWithRed_green_blue_alpha_(
+                            0.35, 0.65, 1.0, 0.95
+                        )
+                    else:
+                        bar_color = NSColor.colorWithRed_green_blue_alpha_(
+                            0.25, 0.50, 0.85, 0.65
+                        )
+                    bar_color.set()
+                    NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+                        NSMakeRect(bx, _BAR_BOTTOM, _BAR_W, bar_h), 2, 2
+                    ).fill()
+
+                    # 曜日ラベル
+                    label_attr = NSAttributedString.alloc().initWithString_attributes_(
+                        ds.label,
+                        {
+                            NSFontAttributeName: NSFont.systemFontOfSize_(8),
+                            NSForegroundColorAttributeName: (
+                                NSColor.colorWithRed_green_blue_alpha_(
+                                    0.45, 0.7, 1.0, 1.0
+                                )
+                                if ds.is_today
+                                else c["row_time"]
+                            ),
+                        },
+                    )
+                    label_attr.drawAtPoint_(NSMakePoint(bx + _BAR_W / 2 - 4, _LABEL_Y))
+
+                # ホバー中のバーにツールチップを表示
+                if (
+                    self._hover_bar_index is not None
+                    and 0 <= self._hover_bar_index < len(daily)
+                ):
+                    hi = self._hover_bar_index
+                    ds = daily[hi]
+                    tip_lines = [
+                        f"{ds.date_str}({ds.label})",
+                        f"${ds.cost:.2f}",
+                        f"{_fmt_tokens(ds.tokens)} tok",
+                    ]
+                    tip_x = 10 + hi * _BAR_SLOT_W
+                    tip_w = 70.0
+                    if tip_x + tip_w > PANEL_W - 6:
+                        tip_x = PANEL_W - 6 - tip_w
+                    tip_y = (
+                        _BAR_BOTTOM
+                        + min(max(4.0, _BAR_MAX_H * ds.tokens / max_tok), _BAR_MAX_H)
+                        + 4
+                    )
+                    tip_h = 38.0
+                    tip_bg = NSColor.colorWithRed_green_blue_alpha_(
+                        0.1, 0.1, 0.15, 0.92
+                    )
+                    tip_bg.set()
+                    NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+                        NSMakeRect(tip_x, tip_y, tip_w, tip_h), 4, 4
+                    ).fill()
+                    tip_attrs = {
+                        NSFontAttributeName: NSFont.systemFontOfSize_(8),
+                        NSForegroundColorAttributeName: NSColor.colorWithRed_green_blue_alpha_(
+                            0.9, 0.9, 0.9, 1.0
+                        ),
+                    }
+                    for j, line in enumerate(tip_lines):
+                        NSAttributedString.alloc().initWithString_attributes_(
+                            line, tip_attrs
+                        ).drawAtPoint_(
+                            NSMakePoint(tip_x + 5, tip_y + tip_h - 13 - j * 12)
+                        )
+        else:
+            detail_entry = None
+            if self._selected_row is not None and 0 <= self._selected_row < len(
+                self._logs
+            ):
+                detail_entry = self._logs[self._selected_row]
+            elif self._logs:
+                detail_entry = self._logs[0]  # 未選択時は最新のログを表示
+
+        if not self._show_usage_detail and detail_entry is not None:
             attr = NSAttributedString.alloc().initWithString_attributes_(
                 detail_entry.message,
                 {
@@ -200,7 +353,8 @@ class LogPanelView(NSView):
             area_x, area_y = 10, 30
             area_w, area_h = PANEL_W - 26, DETAIL_H - 34
             bound = attr.boundingRectWithSize_options_(
-                NSMakeSize(area_w, 100000.0), 1  # NSStringDrawingUsesLineFragmentOrigin
+                NSMakeSize(area_w, 100000.0),
+                1,  # NSStringDrawingUsesLineFragmentOrigin
             )
             text_h = max(area_h, bound.size.height)
             self._detail_max_scroll = max(0.0, bound.size.height - area_h)
@@ -212,9 +366,7 @@ class LogPanelView(NSView):
             NSBezierPath.clipRect_(NSMakeRect(area_x, area_y, area_w, area_h))
             top = area_y + area_h
             attr.drawInRect_(
-                NSMakeRect(
-                    area_x, top - text_h + self._detail_scroll, area_w, text_h
-                )
+                NSMakeRect(area_x, top - text_h + self._detail_scroll, area_w, text_h)
             )
             NSGraphicsContext.currentContext().restoreGraphicsState()
 
@@ -222,10 +374,8 @@ class LogPanelView(NSView):
             if self._detail_max_scroll > 0:
                 track_h = area_h
                 thumb_h = max(12, track_h * area_h / bound.size.height)
-                thumb_y = (
-                    area_y
-                    + (track_h - thumb_h)
-                    * (1.0 - self._detail_scroll / self._detail_max_scroll)
+                thumb_y = area_y + (track_h - thumb_h) * (
+                    1.0 - self._detail_scroll / self._detail_max_scroll
                 )
                 c["scroll"].set()
                 NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
@@ -245,7 +395,7 @@ class LogPanelView(NSView):
                     NSForegroundColorAttributeName: NSColor.whiteColor(),
                 },
             ).drawAtPoint_(NSMakePoint(PANEL_W - 114, 10))
-        else:
+        elif not self._show_usage_detail:
             NSAttributedString.alloc().initWithString_attributes_(
                 "ログはまだありません",
                 {
@@ -316,6 +466,27 @@ class LogPanelView(NSView):
                 NSMakeRect(PANEL_W - 5, thumb_y, 3, thumb_h), 1, 1
             ).fill()
 
+    def mouseMoved_(self, event) -> None:
+        if not self._show_usage_detail:
+            return
+        loc = event.locationInWindow()
+        if _BAR_BOTTOM <= loc.y <= _BAR_BOTTOM + _BAR_MAX_H + 4:
+            bar_x = loc.x - 10
+            if 0 <= bar_x < 7 * _BAR_SLOT_W:
+                idx = int(bar_x / _BAR_SLOT_W)
+                if self._hover_bar_index != idx:
+                    self._hover_bar_index = idx
+                    self.setNeedsDisplay_(True)
+                return
+        if self._hover_bar_index is not None:
+            self._hover_bar_index = None
+            self.setNeedsDisplay_(True)
+
+    def mouseExited_(self, event) -> None:
+        if self._hover_bar_index is not None:
+            self._hover_bar_index = None
+            self.setNeedsDisplay_(True)
+
     def scrollWheel_(self, event) -> None:
         loc = event.locationInWindow()
         if loc.y <= DETAIL_H:
@@ -359,9 +530,17 @@ class LogPanelView(NSView):
             elif loc.x >= PANEL_W - 92 and self._on_toggle_voice is not None:
                 self._on_toggle_voice()
                 self.setNeedsDisplay_(True)
+            elif 101 <= loc.x <= PANEL_W - 96 and self._usage is not None:
+                # 利用量バッジをクリック → 詳細表示トグル
+                self._show_usage_detail = not self._show_usage_detail
+                self.setNeedsDisplay_(True)
             return
 
         if loc.y <= DETAIL_H:
+            if self._show_usage_detail:
+                self._show_usage_detail = False
+                self.setNeedsDisplay_(True)
+                return
             # 「セッションに飛ぶ」ボタン
             if (
                 self._logs
