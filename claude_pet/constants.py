@@ -10,7 +10,7 @@ PANEL_H = 250
 LOG_ROW_H = 24
 LOG_ROWS_VISIBLE = 5
 PANEL_HEADER_H = 36
-DETAIL_H = 62
+DETAIL_H = 84
 
 # ペット窓内での吹き出し下辺 Y（AppKit 座標系 = 下が0）
 BUBBLE_Y = 208

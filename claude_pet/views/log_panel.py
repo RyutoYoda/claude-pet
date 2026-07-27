@@ -188,7 +188,21 @@ class LogPanelView(NSView):
                     NSFontAttributeName: NSFont.systemFontOfSize_(9),
                     NSForegroundColorAttributeName: c["row_text"],
                 },
-            ).drawInRect_(NSMakeRect(10, 4, PANEL_W - 20, DETAIL_H - 8))
+            ).drawInRect_(NSMakeRect(10, 30, PANEL_W - 20, DETAIL_H - 34))
+
+            # セッションに飛ぶボタン（水色）
+            NSColor.colorWithRed_green_blue_alpha_(0.35, 0.65, 0.95, 0.95).set()
+            btn = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+                NSMakeRect(PANEL_W - 122, 5, 112, 20), 6, 6
+            )
+            btn.fill()
+            NSAttributedString.alloc().initWithString_attributes_(
+                "セッションに飛ぶ →",
+                {
+                    NSFontAttributeName: NSFont.boldSystemFontOfSize_(9),
+                    NSForegroundColorAttributeName: NSColor.whiteColor(),
+                },
+            ).drawAtPoint_(NSMakePoint(PANEL_W - 114, 10))
         else:
             NSAttributedString.alloc().initWithString_attributes_(
                 "← 行をクリックで全文表示",
@@ -233,20 +247,12 @@ class LogPanelView(NSView):
             ).drawAtPoint_(NSMakePoint(10, y + 5))
 
             truncated = (
-                entry.message[:14] + "…" if len(entry.message) > 15 else entry.message
+                entry.message[:16] + "…" if len(entry.message) > 17 else entry.message
             )
             truncated = truncated.replace("\n", " ")
             NSAttributedString.alloc().initWithString_attributes_(
                 truncated, row_attrs
             ).drawAtPoint_(NSMakePoint(42, y + 4))
-
-            NSAttributedString.alloc().initWithString_attributes_(
-                "▶",
-                {
-                    NSFontAttributeName: NSFont.systemFontOfSize_(9),
-                    NSForegroundColorAttributeName: c["session_btn"],
-                },
-            ).drawAtPoint_(NSMakePoint(PANEL_W - 42, y + 6))
 
             NSAttributedString.alloc().initWithString_attributes_(
                 "✕", x_btn_attrs
@@ -302,6 +308,14 @@ class LogPanelView(NSView):
             return
 
         if loc.y <= DETAIL_H:
+            # 「セッションに飛ぶ」ボタン
+            if (
+                self._selected_row is not None
+                and PANEL_W - 122 <= loc.x <= PANEL_W - 10
+                and 5 <= loc.y <= 25
+            ):
+                self._on_session()
+                return
             self._selected_row = None
             self.setNeedsDisplay_(True)
             return
@@ -321,8 +335,6 @@ class LogPanelView(NSView):
                     elif self._selected_row > row:
                         self._selected_row -= 1
             self.setNeedsDisplay_(True)
-        elif loc.x >= PANEL_W - 52:
-            self._on_session()
         else:
             self._selected_row = None if self._selected_row == row else row
             self.setNeedsDisplay_(True)

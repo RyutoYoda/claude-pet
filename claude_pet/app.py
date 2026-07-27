@@ -263,7 +263,7 @@ def _on_image_change(
 def _activate_terminal() -> None:
     script = """
     tell application "System Events"
-        set termApps to {"iTerm2", "Terminal", "Warp", "Hyper", "Alacritty", "WezTerm"}
+        set termApps to {"ghostty", "Ghostty", "iTerm2", "Terminal", "Warp", "Hyper", "Alacritty", "WezTerm"}
         repeat with appName in termApps
             if (count of (every process whose name is appName)) > 0 then
                 set frontmost of (first process whose name is appName) to true
