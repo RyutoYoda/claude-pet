@@ -10,12 +10,13 @@ from AppKit import (
     NSFont,
     NSFontAttributeName,
     NSForegroundColorAttributeName,
+    NSGraphicsContext,
     NSMakeRect,
     NSPanel,
     NSView,
     NSWindowStyleMaskBorderless,
 )
-from Foundation import NSAttributedString, NSMakePoint, NSPoint
+from Foundation import NSAttributedString, NSMakePoint, NSMakeSize, NSPoint
 
 from claude_pet.constants import (
     DETAIL_H,
@@ -56,6 +57,8 @@ class LogPanelView(NSView):
         self._on_toggle_theme = on_toggle_theme
         self._scroll_offset = 0
         self._selected_row: int | None = None
+        self._detail_scroll = 0.0
+        self._detail_max_scroll = 0.0
         self._on_settings = on_settings
         self._on_session = on_session
         self._get_voice: Callable[[], bool] | None = None
@@ -180,15 +183,54 @@ class LogPanelView(NSView):
         sep2.setLineWidth_(0.5)
         sep2.stroke()
 
+        detail_entry = None
         if self._selected_row is not None and 0 <= self._selected_row < len(self._logs):
-            full_msg = self._logs[self._selected_row].message
-            NSAttributedString.alloc().initWithString_attributes_(
-                full_msg,
+            detail_entry = self._logs[self._selected_row]
+        elif self._logs:
+            detail_entry = self._logs[0]  # 未選択時は最新のログを表示
+
+        if detail_entry is not None:
+            attr = NSAttributedString.alloc().initWithString_attributes_(
+                detail_entry.message,
                 {
                     NSFontAttributeName: NSFont.systemFontOfSize_(9),
                     NSForegroundColorAttributeName: c["row_text"],
                 },
-            ).drawInRect_(NSMakeRect(10, 30, PANEL_W - 20, DETAIL_H - 34))
+            )
+            area_x, area_y = 10, 30
+            area_w, area_h = PANEL_W - 26, DETAIL_H - 34
+            bound = attr.boundingRectWithSize_options_(
+                NSMakeSize(area_w, 100000.0), 1  # NSStringDrawingUsesLineFragmentOrigin
+            )
+            text_h = max(area_h, bound.size.height)
+            self._detail_max_scroll = max(0.0, bound.size.height - area_h)
+            self._detail_scroll = max(
+                0.0, min(self._detail_scroll, self._detail_max_scroll)
+            )
+
+            NSGraphicsContext.currentContext().saveGraphicsState()
+            NSBezierPath.clipRect_(NSMakeRect(area_x, area_y, area_w, area_h))
+            top = area_y + area_h
+            attr.drawInRect_(
+                NSMakeRect(
+                    area_x, top - text_h + self._detail_scroll, area_w, text_h
+                )
+            )
+            NSGraphicsContext.currentContext().restoreGraphicsState()
+
+            # 全文エリアのスクロールバー
+            if self._detail_max_scroll > 0:
+                track_h = area_h
+                thumb_h = max(12, track_h * area_h / bound.size.height)
+                thumb_y = (
+                    area_y
+                    + (track_h - thumb_h)
+                    * (1.0 - self._detail_scroll / self._detail_max_scroll)
+                )
+                c["scroll"].set()
+                NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+                    NSMakeRect(PANEL_W - 12, thumb_y, 3, thumb_h), 1, 1
+                ).fill()
 
             # セッションに飛ぶボタン（水色）
             NSColor.colorWithRed_green_blue_alpha_(0.35, 0.65, 0.95, 0.95).set()
@@ -205,7 +247,7 @@ class LogPanelView(NSView):
             ).drawAtPoint_(NSMakePoint(PANEL_W - 114, 10))
         else:
             NSAttributedString.alloc().initWithString_attributes_(
-                "← 行をクリックで全文表示",
+                "ログはまだありません",
                 {
                     NSFontAttributeName: NSFont.systemFontOfSize_(9),
                     NSForegroundColorAttributeName: c["hint"],
@@ -275,6 +317,18 @@ class LogPanelView(NSView):
             ).fill()
 
     def scrollWheel_(self, event) -> None:
+        loc = event.locationInWindow()
+        if loc.y <= DETAIL_H:
+            # 全文表示エリアのスクロール
+            self._detail_scroll = max(
+                0.0,
+                min(
+                    self._detail_scroll - event.scrollingDeltaY(),
+                    self._detail_max_scroll,
+                ),
+            )
+            self.setNeedsDisplay_(True)
+            return
         delta = int(event.scrollingDeltaY())
         max_offset = max(0, len(self._logs) - LOG_ROWS_VISIBLE)
         self._scroll_offset = max(0, min(self._scroll_offset - delta, max_offset))
@@ -310,13 +364,14 @@ class LogPanelView(NSView):
         if loc.y <= DETAIL_H:
             # 「セッションに飛ぶ」ボタン
             if (
-                self._selected_row is not None
+                self._logs
                 and PANEL_W - 122 <= loc.x <= PANEL_W - 10
                 and 5 <= loc.y <= 25
             ):
                 self._on_session()
                 return
             self._selected_row = None
+            self._detail_scroll = 0.0
             self.setNeedsDisplay_(True)
             return
 
@@ -337,6 +392,7 @@ class LogPanelView(NSView):
             self.setNeedsDisplay_(True)
         else:
             self._selected_row = None if self._selected_row == row else row
+            self._detail_scroll = 0.0
             self.setNeedsDisplay_(True)
 
     def acceptsFirstMouse_(self, event) -> bool:
