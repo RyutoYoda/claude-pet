@@ -205,7 +205,7 @@ def main() -> None:
             if current_request["id"] is None:
                 _show_next_request()
             pet_view.state = PetState.waiting
-            pet_view.show_bubble(f"承認まって！\n{tool}")
+            pet_view.show_bubble(f"承認お願い！\n{tool}")
             if config_usecase.voice_enabled():
                 notifier.speak(f"{tool}の承認をお願いします")
 
