@@ -23,6 +23,7 @@ Claude Code の実行状態を可視化する macOS デスクトップペット�
 - 作業ログの表示・管理
 - ダークモード / ライトモード切替
 - キャラクター画像のカスタマイズ
+<img width="270" height="305" alt="スクリーンショット 2026-07-27 16 10 23" src="https://github.com/user-attachments/assets/e1247549-48e7-46f7-8d6f-6975e256fae7" />
 
 ## インストール
 
