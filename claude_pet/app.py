@@ -150,7 +150,8 @@ def main() -> None:
     # ── Notification handler ───────────────────────────────────────────────
     def on_notify(state: str, message: str | None) -> None:
         notification = notifier.build_notification(state, message)
-        notifier.show_osx_notification(notification)
+        # 通知センターへの投稿は行わない（osascript 経由だと別アプリ名義の
+        # 通知になってしまうため。コード署名対応後にアプリ名義で復活予定）
 
         def update() -> None:
             if config_usecase.voice_enabled():
