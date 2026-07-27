@@ -40,7 +40,8 @@ def main() -> None:
 
     # ── Screen setup ───────────────────────────────────────────────────────
     screen_frame = NSScreen.mainScreen().frame()
-    win_w, win_h = 162, 260
+    # 高さは吹き出しの最大サイズ（8行）が収まるように確保
+    win_w, win_h = 162, 360
     win_x = screen_frame.size.width - win_w - 20
     win_y = 80
 
@@ -88,6 +89,12 @@ def main() -> None:
     )
     pet_view.set_log_panel(log_panel)
     pet_view.set_theme_getter(lambda: config_usecase.load_theme())
+
+    def _on_break(msg: str) -> None:
+        if config_usecase.voice_enabled():
+            notifier.speak(msg)
+
+    pet_view.set_break_callback(_on_break)
     log_panel.contentView().set_voice_controls(
         lambda: config_usecase.voice_enabled(),
         lambda: config_usecase.toggle_voice(),

@@ -91,7 +91,22 @@ class PetView(NSView):
             20.0, self, "idleTalk:", None, True
         )
 
+        import os
+
+        from claude_pet.constants import BREAK_INTERVAL_MIN
+
+        try:
+            break_min = float(os.environ.get("CLAUDE_PET_BREAK_MIN", BREAK_INTERVAL_MIN))
+        except ValueError:
+            break_min = BREAK_INTERVAL_MIN
+        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            break_min * 60.0, self, "breakTime:", None, True
+        )
+
         return self
+
+    def set_break_callback(self, cb: Callable[[str], None]) -> None:
+        self._on_break = cb
 
     def set_log_panel(self, panel: NSPanel | None) -> None:
         self._log_panel = panel
@@ -153,15 +168,31 @@ class PetView(NSView):
         if self._state == PetState.idle and random.random() < 0.4:
             self.show_bubble(random.choice(MESSAGES["idle"]))
 
+    def breakTime_(self, timer) -> None:
+        msg = random.choice(MESSAGES["break"])
+        self.show_bubble(msg)
+        if hasattr(self, "_on_break"):
+            self._on_break(msg)
+
     def drawRect_(self, dirty_rect) -> None:
         NSColor.clearColor().set()
         NSBezierPath.fillRect_(self.bounds())
         if self._bubble_text:
             self._draw_bubble()
 
+    _CHARS_PER_LINE = 14  # 幅142px・フォント10ptに日本語が収まる目安
+    _MAX_LINES = 8
+
     def _draw_bubble(self) -> None:
         text = self._bubble_text
-        n_lines = min(4, max(1, (len(text) // 20) + 1))
+        max_chars = self._MAX_LINES * self._CHARS_PER_LINE
+        if len(text) > max_chars:
+            text = text[: max_chars - 1] + "…"
+        lines = sum(
+            max(1, -(-len(seg) // self._CHARS_PER_LINE))
+            for seg in text.split("\n")
+        )
+        n_lines = min(self._MAX_LINES, lines)
         bh = 20 + n_lines * 16
         bubble_y = 208
         rect = NSMakeRect(2, bubble_y, 156, bh)
