@@ -10,8 +10,7 @@ Claude Code の実行状態を可視化する macOS デスクトップペット�
   <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat&logo=githubactions&logoColor=white" />
 </p>
 
-<img width="726" height="455" alt="スクリーンショット 2026-07-27 10 50 53" src="https://github.com/user-attachments/assets/8eefa3ae-1050-4ab3-a691-f8eadcdb1738" />
-
+<img width="681" height="456" alt="スクリーンショット 2026-07-28 14 55 16" src="https://github.com/user-attachments/assets/823a8b91-c605-4bfb-a44b-114987dc5eb8" />
 
 ## 機能
 
