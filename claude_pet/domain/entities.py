@@ -7,6 +7,8 @@ import dataclasses
 class LogEntry:
     timestamp: str
     message: str
+    cwd: str = ""
+    terminal_pid: int = 0
 
 
 @dataclasses.dataclass(frozen=True)

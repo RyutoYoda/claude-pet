@@ -152,7 +152,9 @@ class PetView(NSView):
 
     def add_log_entry(self, entry: LogEntry) -> None:
         if self._log_panel and self._log_panel.isVisible():
-            self._log_panel.contentView().setNeedsDisplay_(True)
+            cv = self._log_panel.contentView()
+            cv._update_send_placeholder()
+            cv.setNeedsDisplay_(True)
 
     def tick_(self, timer) -> None:
         while not ui_queue.empty():

@@ -10,8 +10,8 @@ from claude_pet.constants import PORT
 
 
 class _Handler(BaseHTTPRequestHandler):
-    notify_callback: Callable[[str, str], None] | None = None
-    permission_callback: Callable[[str, str, str], None] | None = None
+    notify_callback: Callable[[str, str, str, int], None] | None = None
+    permission_callback: Callable[[str, str, str, str, int], None] | None = None
     decisions: dict[str, str] = {}
     last_poll: dict[str, float] = {}
 
@@ -40,6 +40,8 @@ class _Handler(BaseHTTPRequestHandler):
                     request_id,
                     str(data.get("tool", "Unknown")),
                     str(data.get("detail", "")),
+                    str(data.get("cwd", "")),
+                    int(data.get("terminal_pid", 0)),
                 )
             return
 
@@ -48,7 +50,12 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"ok")
         if _Handler.notify_callback:
-            _Handler.notify_callback(data.get("state", "done"), data.get("message", ""))
+            _Handler.notify_callback(
+                data.get("state", "done"),
+                data.get("message", ""),
+                data.get("cwd", ""),
+                int(data.get("terminal_pid", 0)),
+            )
 
     def do_GET(self) -> None:
         if self.path.startswith("/permission/"):
@@ -66,8 +73,8 @@ class _Handler(BaseHTTPRequestHandler):
 class HttpServer:
     def start(
         self,
-        callback: Callable[[str, str], None],
-        permission_callback: Callable[[str, str, str], None] | None = None,
+        callback: Callable[[str, str, str, int], None],
+        permission_callback: Callable[[str, str, str, str, int], None] | None = None,
     ) -> None:
         _Handler.notify_callback = callback
         _Handler.permission_callback = permission_callback

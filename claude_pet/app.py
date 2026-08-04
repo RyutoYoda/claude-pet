@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import os
 import subprocess
 
+import objc
 from AppKit import (
     NSApplication,
     NSBackingStoreBuffered,
     NSColor,
     NSMakeRect,
     NSScreen,
+    NSStatusBar,
     NSWindowStyleMaskBorderless,
 )
-from Foundation import NSMakePoint
+from Foundation import NSMakePoint, NSObject
 
 from claude_pet.constants import PORT
 from claude_pet.domain.enums import PetState
@@ -22,6 +25,19 @@ from claude_pet.usecases.animation_usecase import AnimationUsecase
 from claude_pet.usecases.config_usecase import ConfigUsecase
 from claude_pet.usecases.log_usecase import LogUsecase
 from claude_pet.views.pet_window import PetView, PetWindow, PetWindowDelegate
+
+
+class _StatusBarTarget(NSObject):
+    def initWithWindow_(self, window):
+        self = objc.super(_StatusBarTarget, self).init()
+        self._window = window
+        return self
+
+    def togglePet_(self, sender) -> None:
+        if self._window.isVisible():
+            self._window.orderOut_(None)
+        else:
+            self._window.makeKeyAndOrderFront_(None)
 
 
 def main() -> None:
@@ -103,6 +119,14 @@ def main() -> None:
     window.setContentView_(pet_view)
     window.makeKeyAndOrderFront_(None)
 
+    # ── Menu bar status item (hide/show toggle) ────────────────────────────
+    _status_target = _StatusBarTarget.alloc().initWithWindow_(window)
+    _status_item = NSStatusBar.systemStatusBar().statusItemWithLength_(-1)
+    _status_item.button().setTitle_("Claude Pet")
+    _status_item.button().setToolTip_("Claude Pet を表示/非表示")
+    _status_item.button().setTarget_(_status_target)
+    _status_item.button().setAction_("togglePet:")
+
     # ── Log Panel ──────────────────────────────────────────────────────────
     from claude_pet.views.log_panel import create_log_panel
 
@@ -111,7 +135,8 @@ def main() -> None:
         get_theme=lambda: config_usecase.load_theme(),
         on_toggle_theme=lambda: _toggle_theme(config_usecase, log_panel),
         on_settings=lambda: _open_settings(config_usecase, pet_view),
-        on_session=_activate_terminal,
+        on_session=lambda cwd="", pid=0: _activate_terminal(cwd, pid),
+        on_send_prompt=lambda text, cwd="", pid=0: _send_to_terminal(text, cwd, pid),
     )
     pet_view.set_log_panel(log_panel)
     pet_view.set_theme_getter(lambda: config_usecase.load_theme())
@@ -138,6 +163,7 @@ def main() -> None:
         py = max(10, wf.origin.y + BUBBLE_Y - PANEL_H - 10)
         log_panel.setFrameOrigin_(NSMakePoint(px, py))
         log_panel.makeKeyAndOrderFront_(None)
+        log_panel.contentView()._update_send_placeholder()
 
     pet_view.set_toggle_log_callback(toggle_log_panel)
 
@@ -148,7 +174,7 @@ def main() -> None:
         ui_queue.put(toggle_log_panel)
 
     # ── Notification handler ───────────────────────────────────────────────
-    def on_notify(state: str, message: str | None) -> None:
+    def on_notify(state: str, message: str | None, cwd: str = "", terminal_pid: int = 0) -> None:
         notification = notifier.build_notification(state, message)
         # 通知センターへの投稿は行わない（osascript 経由だと別アプリ名義の
         # 通知になってしまうため。コード署名対応後にアプリ名義で復活予定）
@@ -159,7 +185,7 @@ def main() -> None:
             pet_state = PetState(notification.state)
             pet_view.state = pet_state
             pet_view.show_bubble(notification.message)
-            log_entry = log_usecase.add(notification.message)
+            log_entry = log_usecase.add(notification.message, cwd=cwd, terminal_pid=terminal_pid)
             pet_view.add_log_entry(log_entry)
 
         ui_queue.put(update)
@@ -171,16 +197,20 @@ def main() -> None:
         create_approval_panel,
     )
 
-    pending_requests: list[tuple[str, str, str]] = []
-    current_request: dict = {"id": None}
+    pending_requests: list[tuple[str, str, str, str, int]] = []
+    current_request: dict = {"id": None, "cwd": "", "terminal_pid": 0}
 
     def _show_next_request() -> None:
         if not pending_requests:
             approval_panel.orderOut_(None)
             current_request["id"] = None
+            current_request["cwd"] = ""
+            current_request["terminal_pid"] = 0
             return
-        request_id, tool, detail = pending_requests.pop(0)
+        request_id, tool, detail, cwd, terminal_pid = pending_requests.pop(0)
         current_request["id"] = request_id
+        current_request["cwd"] = cwd
+        current_request["terminal_pid"] = terminal_pid
         approval_view.set_request(tool, detail)
         wf = window.frame()
         px = wf.origin.x - APPROVAL_W - 8
@@ -193,15 +223,19 @@ def main() -> None:
         if request_id:
             http_server.resolve_permission(request_id, action)
             label = "✅ 承認" if action == "allow" else "❌ 拒否"
-            entry = log_usecase.add(f"{label} {approval_view.summary()}")
+            entry = log_usecase.add(
+                f"{label} {approval_view.summary()}",
+                cwd=current_request["cwd"],
+                terminal_pid=current_request["terminal_pid"],
+            )
             pet_view.add_log_entry(entry)
         _show_next_request()
 
     approval_panel, approval_view = create_approval_panel(on_decide)
 
-    def on_permission(request_id: str, tool: str, detail: str) -> None:
+    def on_permission(request_id: str, tool: str, detail: str, cwd: str = "", terminal_pid: int = 0) -> None:
         def update() -> None:
-            pending_requests.append((request_id, tool, detail))
+            pending_requests.append((request_id, tool, detail, cwd, terminal_pid))
             if current_request["id"] is None:
                 _show_next_request()
             pet_view.state = PetState.waiting
@@ -229,6 +263,7 @@ def main() -> None:
                     for r in pending_requests
                     if now - http_server.last_poll_at(r[0]) < _STALE_SEC
                 ]
+
                 request_id = current_request["id"]
                 if (
                     request_id
@@ -287,16 +322,49 @@ def _on_image_change(
     cfg["character_image"] = path
 
 
-def _activate_terminal() -> None:
-    script = """
+def _activate_terminal(cwd: str = "", terminal_pid: int = 0) -> None:
+    script = _build_terminal_script("", terminal_pid, paste=False)
+    subprocess.Popen(["osascript", "-e", script])
+
+
+def _send_to_terminal(text: str, cwd: str = "", terminal_pid: int = 0) -> None:
+    subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=False, timeout=3.0)
+    script = _build_terminal_script("", terminal_pid, paste=True)
+    subprocess.Popen(["osascript", "-e", script])
+
+
+def _build_terminal_script(dir_name: str, terminal_pid: int, paste: bool) -> str:
+    paste_lines = """
+delay 0.5
+tell application "System Events" to keystroke "v" using command down
+delay 0.05
+tell application "System Events" to key code 36""" if paste else ""
+
+    # PID指定がある場合（Ghosttyなどウィンドウごとに別プロセスの端末）
+    pid_block = ""
+    if terminal_pid > 0:
+        pid_block = f"""tell application "System Events"
+    try
+        set frontmost of (first process whose unix id is {terminal_pid}) to true
+        set termFound to true
+    on error
+    end try
+end tell"""
+
+    return f"""
+set termFound to false
+{pid_block}
+if not termFound then
+    -- フォールバック: 最初に見つかったターミナルを前面に
     tell application "System Events"
-        set termApps to {"ghostty", "Ghostty", "iTerm2", "Terminal", "Warp", "Hyper", "Alacritty", "WezTerm"}
+        set termApps to {{"Ghostty", "ghostty", "iTerm2", "Terminal", "Warp", "Hyper", "Alacritty", "WezTerm"}}
         repeat with appName in termApps
             if (count of (every process whose name is appName)) > 0 then
                 set frontmost of (first process whose name is appName) to true
-                return
+                exit repeat
             end if
         end repeat
     end tell
-    """
-    subprocess.Popen(["osascript", "-e", script])
+end if
+{paste_lines}
+"""

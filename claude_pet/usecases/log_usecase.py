@@ -15,10 +15,12 @@ class LogUsecase:
     def logs(self) -> list[LogEntry]:
         return self._logs
 
-    def add(self, message: str) -> LogEntry:
+    def add(self, message: str, cwd: str = "", terminal_pid: int = 0) -> LogEntry:
         entry = LogEntry(
             timestamp=datetime.datetime.now().strftime("%H:%M"),
             message=message,
+            cwd=cwd,
+            terminal_pid=terminal_pid,
         )
         self._logs.insert(0, entry)
         if len(self._logs) > self.MAX_LOGS:

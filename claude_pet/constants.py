@@ -6,11 +6,12 @@ PORT = 3131
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 
 PANEL_W = 260
-PANEL_H = 250
+PANEL_H = 278
 LOG_ROW_H = 24
 LOG_ROWS_VISIBLE = 5
 PANEL_HEADER_H = 36
-DETAIL_H = 84
+DETAIL_H = 112
+INPUT_ROW_H = 28
 
 # ペット窓内での吹き出し下辺 Y（AppKit 座標系 = 下が0）
 BUBBLE_Y = 208

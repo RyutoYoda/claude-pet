@@ -2,11 +2,36 @@
 """Stop/Notification フック: 最後のアシスタントメッセージをペットに送る"""
 
 import json
+import os
 import subprocess
 import sys
 
 PORT = 3131
 MAX_CHARS = 120
+
+
+TERMINAL_APPS = {"ghostty", "Ghostty", "iTerm2", "Terminal", "Warp", "Hyper", "Alacritty", "WezTerm"}
+
+
+def find_terminal_pid() -> int:
+    """プロセスツリーを遡ってターミナルのPIDを返す。見つからなければ0。"""
+    pid = os.getpid()
+    while pid > 1:
+        try:
+            r = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "ppid=,comm="],
+                capture_output=True, text=True, timeout=2,
+            )
+            parts = r.stdout.strip().split(None, 1)
+            if len(parts) < 2:
+                break
+            ppid, comm = int(parts[0]), os.path.basename(parts[1].strip())
+            if comm in TERMINAL_APPS:
+                return pid
+            pid = ppid
+        except (ValueError, OSError, subprocess.SubprocessError):
+            break
+    return 0
 
 
 def get_last_assistant_text(transcript_path: str) -> str:
@@ -58,7 +83,10 @@ def main() -> None:
     if len(text) > MAX_CHARS:
         text = text[: MAX_CHARS - 1] + "…"
 
-    payload = json.dumps({"state": state, "message": text}, ensure_ascii=False)
+    payload = json.dumps(
+        {"state": state, "message": text, "cwd": os.getcwd(), "terminal_pid": find_terminal_pid()},
+        ensure_ascii=False,
+    )
     subprocess.run(
         [
             "curl",

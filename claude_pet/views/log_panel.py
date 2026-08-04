@@ -13,15 +13,17 @@ from AppKit import (
     NSGraphicsContext,
     NSMakeRect,
     NSPanel,
+    NSTextField,
     NSTimer,
     NSTrackingArea,
     NSView,
     NSWindowStyleMaskBorderless,
 )
-from Foundation import NSAttributedString, NSMakePoint, NSMakeSize, NSPoint
+from Foundation import NSAttributedString, NSMakePoint, NSMakeSize, NSObject, NSPoint
 
 from claude_pet.constants import (
     DETAIL_H,
+    INPUT_ROW_H,
     LOG_ROW_H,
     LOG_ROWS_VISIBLE,
     PANEL_H,
@@ -38,9 +40,9 @@ from claude_pet.infrastructure.usage_stats import (
 
 _BAR_SLOT_W = (PANEL_W - 20) / 7  # ~34.3px per day slot
 _BAR_W = _BAR_SLOT_W - 8  # ~26.3px bar width
-_BAR_BOTTOM = 14  # y of bar base (AppKit coords)
+_BAR_BOTTOM = INPUT_ROW_H + 14  # y of bar base (AppKit coords)
 _BAR_MAX_H = 52  # max bar height in px
-_LABEL_Y = 2  # y of day label
+_LABEL_Y = INPUT_ROW_H + 2  # y of day label
 
 
 class LogPanel(NSPanel):
@@ -51,6 +53,39 @@ class LogPanel(NSPanel):
         return False
 
 
+class _TextFieldDelegate(NSObject):
+    def init(self):
+        self = objc.super(_TextFieldDelegate, self).init()
+        self._owner = None
+        return self
+
+    @objc.typedSelector(b"B@:@@:")
+    def control_textView_doCommandBySelector_(self, control, textView, commandSelector) -> bool:
+        try:
+            sel = commandSelector.decode("utf-8") if isinstance(commandSelector, (bytes, bytearray)) else str(commandSelector)
+        except Exception:
+            sel = str(commandSelector)
+        if sel == "insertNewline:":
+            if self._owner is not None:
+                self._owner.sendPrompt_(control)
+            return True
+        return False
+
+
+class _PromptTextField(NSTextField):
+    def scrollWheel_(self, event) -> None:
+        self.superview().scrollWheel_(event)
+
+    def acceptsFirstMouse_(self, event) -> bool:
+        return True
+
+    def mouseDown_(self, event) -> None:
+        from AppKit import NSApplication
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+        self.window().makeKeyWindow()
+        objc.super(_PromptTextField, self).mouseDown_(event)
+
+
 class LogPanelView(NSView):
     def initWithLogs_onTheme_onToggleTheme_onSettings_onSession_(
         self,
@@ -58,7 +93,7 @@ class LogPanelView(NSView):
         get_theme: Callable[[], Theme],
         on_toggle_theme: Callable[[], None],
         on_settings: Callable[[], None],
-        on_session: Callable[[], None],
+        on_session: Callable[[str, int], None],
     ) -> LogPanelView | None:
         self = objc.super(LogPanelView, self).initWithFrame_(
             NSMakeRect(0, 0, PANEL_W, PANEL_H)
@@ -76,6 +111,7 @@ class LogPanelView(NSView):
         self._on_session = on_session
         self._get_voice: Callable[[], bool] | None = None
         self._on_toggle_voice: Callable[[], None] | None = None
+        self._on_send_prompt: Callable[[str, str, int], None] | None = None
         self._usage: UsageStats | None = None
         self._show_usage_detail = False
         self._hover_bar_index: int | None = None
@@ -88,6 +124,22 @@ class LogPanelView(NSView):
             NSMakeRect(0, 0, PANEL_W, PANEL_H), 2 | 128 | 1, self, None
         )
         self.addTrackingArea_(ta)
+
+        # プロンプト送信テキストフィールド
+        self._input_field = _PromptTextField.alloc().initWithFrame_(
+            NSMakeRect(8, 5, PANEL_W - 18, 18)
+        )
+        self._input_field.setPlaceholderString_("Claudeにメッセージを送信...")
+        self._input_field.setFont_(NSFont.systemFontOfSize_(10))
+        self._input_field.setBordered_(False)
+        self._input_field.setDrawsBackground_(False)
+        self._input_field.setEditable_(True)
+        self._input_field.setSelectable_(True)
+        self._tf_delegate = _TextFieldDelegate.alloc().init()
+        self._tf_delegate._owner = self
+        self._input_field.setDelegate_(self._tf_delegate)
+        self.addSubview_(self._input_field)
+
         return self
 
     def _refresh_usage(self) -> None:
@@ -99,6 +151,48 @@ class LogPanelView(NSView):
     def refreshUsageTick_(self, timer) -> None:
         self._refresh_usage()
         self.setNeedsDisplay_(True)
+
+    def _update_send_placeholder(self) -> None:
+        entry = self._displayed_entry()
+        if entry and entry.cwd:
+            import os as _os
+            d = _os.path.basename(entry.cwd.rstrip("/"))
+            self._input_field.setPlaceholderString_(f"→ {d}  に送信 (Enter)")
+        else:
+            self._input_field.setPlaceholderString_("Claudeにメッセージを送信...")
+
+    def sendPrompt_(self, sender) -> None:
+        text = self._input_field.stringValue().strip()
+        if not text or self._on_send_prompt is None:
+            return
+        self._input_field.setStringValue_("")
+        self._input_field.setPlaceholderString_("✓ 送信中...")
+        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            1.5, self, "resetInputPlaceholder:", None, False
+        )
+        entry = self._displayed_entry()
+        cwd = entry.cwd if entry else ""
+        pid = entry.terminal_pid if entry else 0
+        self._on_send_prompt(text, cwd, pid)
+
+    def resetInputPlaceholder_(self, timer) -> None:
+        self._input_field.setPlaceholderString_("Claudeにメッセージを送信...")
+
+    def set_send_prompt_callback(
+        self, callback: Callable[[str, str, int], None]
+    ) -> None:
+        self._on_send_prompt = callback
+
+    def _displayed_entry(self):
+        if self._selected_row is not None and 0 <= self._selected_row < len(self._logs):
+            return self._logs[self._selected_row]
+        if self._logs:
+            return self._logs[0]
+        return None
+
+    def _displayed_entry_cwd(self) -> str:
+        entry = self._displayed_entry()
+        return entry.cwd if entry else ""
 
     def set_voice_controls(
         self,
@@ -240,6 +334,27 @@ class LogPanelView(NSView):
         sep2.setLineWidth_(0.5)
         sep2.stroke()
 
+        # 入力エリアの背景
+        (
+            NSColor.colorWithRed_green_blue_alpha_(0.18, 0.18, 0.18, 0.6)
+            if self._theme().dark_mode
+            else NSColor.colorWithWhite_alpha_(0.82, 0.6)
+        ).set()
+        NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+            NSMakeRect(6, 3, PANEL_W - 12, 22), 4, 4
+        ).fill()
+
+        # 入力エリアと全文エリアの区切り線
+        c["sep"].set()
+        sep3 = NSBezierPath.bezierPath()
+        sep3.moveToPoint_(NSMakePoint(8, INPUT_ROW_H))
+        sep3.lineToPoint_(NSMakePoint(PANEL_W - 8, INPUT_ROW_H))
+        sep3.setLineWidth_(0.5)
+        sep3.stroke()
+
+        # テキストフィールドのカラーをテーマに合わせて更新
+        self._input_field.setTextColor_(c["row_text"])
+
         detail_entry: LogEntry | None = None
 
         # 利用量詳細表示モード（棒グラフ）
@@ -350,8 +465,8 @@ class LogPanelView(NSView):
                     NSForegroundColorAttributeName: c["row_text"],
                 },
             )
-            area_x, area_y = 10, 30
-            area_w, area_h = PANEL_W - 26, DETAIL_H - 34
+            area_x, area_y = 10, INPUT_ROW_H + 30
+            area_w, area_h = PANEL_W - 26, DETAIL_H - 34 - INPUT_ROW_H
             bound = attr.boundingRectWithSize_options_(
                 NSMakeSize(area_w, 100000.0),
                 1,  # NSStringDrawingUsesLineFragmentOrigin
@@ -385,7 +500,7 @@ class LogPanelView(NSView):
             # セッションに飛ぶボタン（水色）
             NSColor.colorWithRed_green_blue_alpha_(0.35, 0.65, 0.95, 0.95).set()
             btn = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
-                NSMakeRect(PANEL_W - 122, 5, 112, 20), 6, 6
+                NSMakeRect(PANEL_W - 122, INPUT_ROW_H + 5, 112, 20), 6, 6
             )
             btn.fill()
             NSAttributedString.alloc().initWithString_attributes_(
@@ -394,7 +509,7 @@ class LogPanelView(NSView):
                     NSFontAttributeName: NSFont.boldSystemFontOfSize_(9),
                     NSForegroundColorAttributeName: NSColor.whiteColor(),
                 },
-            ).drawAtPoint_(NSMakePoint(PANEL_W - 114, 10))
+            ).drawAtPoint_(NSMakePoint(PANEL_W - 114, INPUT_ROW_H + 10))
         elif not self._show_usage_detail:
             NSAttributedString.alloc().initWithString_attributes_(
                 "ログはまだありません",
@@ -402,7 +517,7 @@ class LogPanelView(NSView):
                     NSFontAttributeName: NSFont.systemFontOfSize_(9),
                     NSForegroundColorAttributeName: c["hint"],
                 },
-            ).drawAtPoint_(NSMakePoint(10, DETAIL_H // 2 - 4))
+            ).drawAtPoint_(NSMakePoint(10, (INPUT_ROW_H + DETAIL_H) // 2 - 4))
 
         row_attrs = {
             NSFontAttributeName: NSFont.systemFontOfSize_(10),
@@ -438,13 +553,29 @@ class LogPanelView(NSView):
                 entry.timestamp, time_attrs
             ).drawAtPoint_(NSMakePoint(10, y + 5))
 
+            max_msg_len = 8 if abs_row == 0 else 16
             truncated = (
-                entry.message[:16] + "…" if len(entry.message) > 17 else entry.message
+                entry.message[:max_msg_len] + "…"
+                if len(entry.message) > max_msg_len
+                else entry.message
             )
             truncated = truncated.replace("\n", " ")
             NSAttributedString.alloc().initWithString_attributes_(
                 truncated, row_attrs
             ).drawAtPoint_(NSMakePoint(42, y + 4))
+
+            if abs_row == 0:
+                NSColor.colorWithRed_green_blue_alpha_(0.15, 0.72, 0.35, 0.9).set()
+                NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+                    NSMakeRect(163, y + 5, 46, 13), 4, 4
+                ).fill()
+                NSAttributedString.alloc().initWithString_attributes_(
+                    "active",
+                    {
+                        NSFontAttributeName: NSFont.systemFontOfSize_(8),
+                        NSForegroundColorAttributeName: NSColor.whiteColor(),
+                    },
+                ).drawAtPoint_(NSMakePoint(167, y + 6))
 
             NSAttributedString.alloc().initWithString_attributes_(
                 "✕", x_btn_attrs
@@ -503,7 +634,6 @@ class LogPanelView(NSView):
         delta = int(event.scrollingDeltaY())
         max_offset = max(0, len(self._logs) - LOG_ROWS_VISIBLE)
         self._scroll_offset = max(0, min(self._scroll_offset - delta, max_offset))
-        self._selected_row = None
         self.setNeedsDisplay_(True)
 
     def _row_at_point(self, loc: NSPoint) -> int:
@@ -537,6 +667,8 @@ class LogPanelView(NSView):
             return
 
         if loc.y <= DETAIL_H:
+            if loc.y <= INPUT_ROW_H:
+                return  # 入力フィールドエリア（NSTextFieldが処理）
             if self._show_usage_detail:
                 self._show_usage_detail = False
                 self.setNeedsDisplay_(True)
@@ -545,12 +677,15 @@ class LogPanelView(NSView):
             if (
                 self._logs
                 and PANEL_W - 122 <= loc.x <= PANEL_W - 10
-                and 5 <= loc.y <= 25
+                and INPUT_ROW_H + 5 <= loc.y <= INPUT_ROW_H + 25
             ):
-                self._on_session()
+                entry = self._displayed_entry()
+                self._on_session(
+                    entry.cwd if entry else "",
+                    entry.terminal_pid if entry else 0,
+                )
                 return
-            self._selected_row = None
-            self._detail_scroll = 0.0
+            # 詳細エリアのクリックで選択を消さない（ジャンプバグの修正）
             self.setNeedsDisplay_(True)
             return
 
@@ -572,6 +707,7 @@ class LogPanelView(NSView):
         else:
             self._selected_row = None if self._selected_row == row else row
             self._detail_scroll = 0.0
+            self._update_send_placeholder()
             self.setNeedsDisplay_(True)
 
     def acceptsFirstMouse_(self, event) -> bool:
@@ -583,7 +719,8 @@ def create_log_panel(
     get_theme: Callable[[], Theme],
     on_toggle_theme: Callable[[], None],
     on_settings: Callable[[], None],
-    on_session: Callable[[], None],
+    on_session: Callable[[str, int], None],
+    on_send_prompt: Callable[[str, str, int], None] | None = None,
 ) -> LogPanel:
     panel = LogPanel.alloc().initWithContentRect_styleMask_backing_defer_(
         NSMakeRect(0, 0, PANEL_W, PANEL_H),
@@ -603,6 +740,8 @@ def create_log_panel(
             logs, get_theme, on_toggle_theme, on_settings, on_session
         )
     )
+    if on_send_prompt is not None:
+        view.set_send_prompt_callback(on_send_prompt)
     panel.setContentView_(view)
     panel.makeFirstResponder_(view)
     return panel

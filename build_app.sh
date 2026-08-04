@@ -5,6 +5,10 @@ APP_NAME="Claude Pet"
 VERSION="${1:-1.0.0}"
 APP_DIR="dist/$APP_NAME.app"
 
+# 署名用 (環境変数で上書き可能)
+SIGN_APP="${SIGN_APP:-Developer ID Application: RYUTO YODA (246DJYP2AH)}"
+SIGN_INSTALLER="${SIGN_INSTALLER:-Developer ID Installer: RYUTO YODA (246DJYP2AH)}"
+
 echo "=== Building $APP_NAME v$VERSION ==="
 rm -rf dist
 
@@ -16,7 +20,6 @@ cp -r claude_pet "$APP_DIR/Contents/Resources/"
 cp -r assets "$APP_DIR/Contents/Resources/"
 cp notify_hook.py "$APP_DIR/Contents/Resources/"
 cp permission_hook.py "$APP_DIR/Contents/Resources/"
-cp assets/AppIcon.icns "$APP_DIR/Contents/Resources/"
 
 # ── Launcher (uses system python3 + PYTHONPATH) ──────────────────────────
 cat > "$APP_DIR/Contents/MacOS/$APP_NAME" << 'LAUNCHER'
@@ -94,8 +97,6 @@ cat > "$APP_DIR/Contents/Info.plist" << PLIST
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 </dict>
@@ -111,11 +112,37 @@ chmod -R u+w "$APP_DIR"
 echo "=== .app bundle created ==="
 du -sh "$APP_DIR"
 
+# ── Entitlements for hardened runtime ─────────────────────────────────────
+cat > /tmp/claude-pet-entitlements.plist << 'ENTITLEMENTS'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+</dict>
+</plist>
+ENTITLEMENTS
+
+# ── Sign .app bundle (Developer ID Application + hardened runtime) ─────────
+echo "=== Signing .app bundle ==="
+codesign --force --deep \
+    --sign "$SIGN_APP" \
+    --options runtime \
+    --entitlements /tmp/claude-pet-entitlements.plist \
+    --timestamp \
+    "$APP_DIR"
+codesign --verify --verbose=1 "$APP_DIR"
+echo "✓ .app signed"
+
 # ── Build component pkg with postinstall script ──────────────────────────
 chmod +x installer_resources/scripts/postinstall
+find installer_resources/scripts -name '._*' -delete 2>/dev/null || true
 
 COMPONENT_PKG="dist/Claude-Pet-${VERSION}.pkg"
-pkgbuild \
+COPYFILE_DISABLE=1 pkgbuild \
     --root "$APP_DIR" \
     --identifier com.claude-pet.app \
     --version "$VERSION" \
@@ -127,14 +154,27 @@ pkgbuild \
 DIST_PKG="dist/Claude-Pet-${VERSION}-installer.pkg"
 cp installer_resources/Distribution.xml /tmp/Distribution-${VERSION}.xml
 sed -i '' "s/#VERSION#/$VERSION/g" /tmp/Distribution-${VERSION}.xml
-productbuild \
+COPYFILE_DISABLE=1 productbuild \
     --distribution /tmp/Distribution-${VERSION}.xml \
     --package-path dist \
     --resources installer_resources \
     "$DIST_PKG"
 
-# Clean up intermediate files
+# Clean up intermediate component pkg
 rm -f "$COMPONENT_PKG"
 
+# ── Sign the distribution pkg (Developer ID Installer) ────────────────────
+echo "=== Signing distribution PKG ==="
+SIGNED_PKG="dist/Claude-Pet-${VERSION}-signed.pkg"
+productsign \
+    --sign "$SIGN_INSTALLER" \
+    --timestamp \
+    "$DIST_PKG" \
+    "$SIGNED_PKG"
+pkgutil --check-signature "$SIGNED_PKG"
+echo "✓ PKG signed: $SIGNED_PKG"
+
 echo "=== Done ==="
-ls -lh "$DIST_PKG"
+ls -lh "$SIGNED_PKG"
+echo ""
+echo "Next: xcrun notarytool submit $SIGNED_PKG --apple-id <ID> --team-id <TEAM> --password <PW> --wait"

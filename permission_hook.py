@@ -7,11 +7,34 @@ Claude Pet が起動していない場合やタイムアウト時は何も出力
 
 import json
 import os
+import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
 import uuid
+
+TERMINAL_APPS = {"ghostty", "Ghostty", "iTerm2", "Terminal", "Warp", "Hyper", "Alacritty", "WezTerm"}
+
+
+def _find_terminal_pid() -> int:
+    pid = os.getpid()
+    while pid > 1:
+        try:
+            r = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "ppid=,comm="],
+                capture_output=True, text=True, timeout=2,
+            )
+            parts = r.stdout.strip().split(None, 1)
+            if len(parts) < 2:
+                break
+            ppid, comm = int(parts[0]), os.path.basename(parts[1].strip())
+            if comm in TERMINAL_APPS:
+                return pid
+            pid = ppid
+        except (ValueError, OSError, subprocess.SubprocessError):
+            break
+    return 0
 
 PORT = 3131
 TIMEOUT_SEC = 290
@@ -48,7 +71,13 @@ def main() -> None:
     _log(f"request: tool={tool} detail={detail[:60]}")
     request_id = str(uuid.uuid4())
     payload = json.dumps(
-        {"id": request_id, "tool": tool, "detail": detail}
+        {
+            "id": request_id,
+            "tool": tool,
+            "detail": detail,
+            "cwd": os.getcwd(),
+            "terminal_pid": _find_terminal_pid(),
+        }
     ).encode("utf-8")
     req = urllib.request.Request(
         f"http://127.0.0.1:{PORT}/permission",
